@@ -41,7 +41,7 @@ SDL2pp::SDL2pp(SDL2pp const &cpy): init_flags(cpy.init_flags), window(nullptr)
 /**
  * Destroys window and quits SDL2 library subsystems if it's the last instance.
  */
-SDL2pp::~SDL2pp(void)
+SDL2pp::~SDL2pp(void) noexcept
 {
 	--SDL2pp::instances;
 	if (this->window)

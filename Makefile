@@ -20,7 +20,7 @@ SDLL	:= $(shell sdl2-config --libs)
 
 SDLI	:= $(shell sdl2-config --cflags)
 
-CFLAGS	+= -Wall -Wextra -Werror -Wshadow -g -I$(DHDR)
+CFLAGS	+= -Wall -Wextra -Werror -Wshadow -g -std=c++2b -I$(DHDR)
 
 CC		:= c++
 

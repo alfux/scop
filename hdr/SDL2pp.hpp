@@ -18,7 +18,7 @@ class	SDL2pp
 		SDL2pp(void);
 		SDL2pp(Uint32 flags);
 		SDL2pp(SDL2pp const &cpy);
-		~SDL2pp(void);
+		virtual ~SDL2pp(void) noexcept;
 
 		SDL2pp	&operator=(SDL2pp const &cpy);
 
