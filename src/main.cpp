@@ -1,12 +1,12 @@
 #include <main.hpp>
 
-int	main(void)
+int main(void)
 {
 	try
 	{
-		SDL2pp	instance;
+		Scop scop;
 
-		instance.main();
+		scop.mainLoop();
 		return (0);
 	}
 	catch (std::exception const &e)

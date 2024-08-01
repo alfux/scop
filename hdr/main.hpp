@@ -3,6 +3,6 @@
 
 # include <iostream>
 # include <exception>
-# include <SDL2pp.hpp>
+# include <Scop.hpp>
 
 #endif

@@ -1,18 +1,22 @@
 #ifndef SDL2PP_HPP
 # define SDL2PP_HPP
 # include <Error.hpp>
+# include <vector>
 # include <SDL.h>
+# include <SDL_vulkan.h>
+# include <vulkan/vulkan.h>
+# include <vulkan/vulkan_core.h>
 
-/*
+
+/**
  * Wrapper class for the SDL2 library functionalities.
  */
-class	SDL2pp
+class SDL2pp
 {
-	static size_t	instances;
+	static size_t instances;
 
-	Uint32		init_flags;
-	SDL_Window	*window;
-	SDL_Event	events;
+	Uint32 init_flags;
+	SDL_Window *window;
 
 	public:
 		SDL2pp(void);
@@ -20,9 +24,14 @@ class	SDL2pp
 		SDL2pp(SDL2pp const &cpy);
 		virtual ~SDL2pp(void) noexcept;
 
-		SDL2pp	&operator=(SDL2pp const &cpy);
+		SDL2pp &operator=(SDL2pp const &cpy);
 
-		int		main() const;
+		void addWindow(char const *t, int x, int y, int w, int h, Uint32 flags);
+		void destroyWindow(void);
+		int pollEvent(SDL_Event *event);
+		void getVulkanExtensions(std::vector<const char *> &p_names);
+		void vkCreateInstance(const VkInstanceCreateInfo &p_create_info,
+			const VkAllocationCallbacks *p_allocator, VkInstance &instance);
 };
 
 #endif
