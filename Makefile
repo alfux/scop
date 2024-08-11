@@ -37,8 +37,13 @@ all			:	$(NAME)
 $(NAME)		:	$(OBJ)
 				$(CC) $(CFLAGS) $(SDLL) $(VULKANL) $^ -o $@
 
+ifeq ($(debug), true)
 $(DOBJ)/%.o	:	$(DSRC)/%.cpp $(DHDR)/%.hpp | $(DOBJ)
 				$(CC) $(CFLAGS) $(SDLI) $(VULKANI) -c $< -o $@
+else
+$(DOBJ)/%.o	:	$(DSRC)/%.cpp $(DHDR)/%.hpp | $(DOBJ)
+				$(CC) $(CFLAGS) -D NDEBUG $(SDLI) $(VULKANI) -c $< -o $@
+endif
 
 $(DOBJ)		:
 				mkdir $@

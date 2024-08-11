@@ -15,7 +15,7 @@ class SDL2pp
 {
 	static size_t instances;
 
-	Uint32 init_flags;
+	uint32_t init_flags;
 	SDL_Window *window;
 
 	public:
@@ -29,9 +29,8 @@ class SDL2pp
 		void addWindow(char const *t, int x, int y, int w, int h, Uint32 flags);
 		void destroyWindow(void);
 		int pollEvent(SDL_Event *event);
-		void getVulkanExtensions(std::vector<const char *> &p_names);
-		void vkCreateInstance(const VkInstanceCreateInfo &p_create_info,
-			const VkAllocationCallbacks *p_allocator, VkInstance &instance);
+		void getVulkanExtensions(std::vector<const char *> &names,
+			bool debug = false);
 };
 
 #endif

@@ -94,7 +94,7 @@ void SDL2pp::addWindow(const char *t, int x, int y, int w, int h, Uint32 flags)
 }
 
 /**
- * Destroys specified window
+ * Destroys window
  */
 void SDL2pp::destroyWindow()
 {
@@ -113,7 +113,7 @@ int SDL2pp::pollEvent(SDL_Event *event)
  * Fills vector <names> with Vulkan extenstions names needed to create a
  * VkInstance
  */
-void SDL2pp::getVulkanExtensions(std::vector<const char *> &names)
+void SDL2pp::getVulkanExtensions(std::vector<const char *> &names, bool debug)
 {
 	unsigned int count = 0;
 
@@ -129,16 +129,9 @@ void SDL2pp::getVulkanExtensions(std::vector<const char *> &names)
 	{
 		throw (Error("SDL2pp::getVulkanExtensions", "can't get pNames"));
 	}
-}
 
-/**
- * Creates an instance of Vulkan and delivers the handle to <instance>
- */
-void SDL2pp::vkCreateInstance(const VkInstanceCreateInfo &create_info,
-	const VkAllocationCallbacks *allocator, VkInstance &instance)
-{
-	if (::vkCreateInstance(&create_info, allocator, &instance) != VK_SUCCESS)
+	if (debug)
 	{
-		throw (Error("SDL2pp::vkCreateInstance", "failed to create instance"));
+		names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 	}
 }
