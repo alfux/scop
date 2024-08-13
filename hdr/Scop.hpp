@@ -6,6 +6,7 @@
 
 # include <SDL2pp.hpp>
 # include <cstring>
+# include <optional>
 
 class Scop
 {
@@ -14,15 +15,22 @@ class Scop
 	const uint32_t width;
 	const uint32_t height;
 
-	std::vector<const char *> validationLayers;
+	std::vector<const char *> validation_layers;
 
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
-
+	VkPhysicalDevice physical_device;
 
 	const bool enableValidationLayers;
 
 	public:
+		struct QueueFamilyIndices
+		{
+			std::optional<uint32_t> graphics_family;
+
+			bool isComplete();
+		};
+
 		Scop(void);
 		Scop(const Scop &cpy);
 		virtual ~Scop(void) noexcept;
@@ -31,9 +39,11 @@ class Scop
 
 		bool manageEvent(void);
 		void initVulkan(void);
+		void cleanup(void);
 		void createInstance(void);
-		void setupDebugMessenger();
-		void checkValidationLayerSupport(void);		
+		void setupDebugMessenger(void);
+		void checkValidationLayerSupport(void);
+		void pickPhysicalDevice(void);
 		void mainLoop(void);
 
 		static VkResult createDebugUtilsMessengerEXT(

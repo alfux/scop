@@ -1,10 +1,22 @@
 #include <Scop.hpp>
 
+/**
+ * Checks if the structure has a value.
+ */
+bool Scop::QueueFamilyIndices::isComplete(void)
+{
+	return (graphics_family.has_value());
+}
+
+/**
+ * Default standard constructor.
+ */
 Scop::Scop(void) :
-	sdl{SDL_INIT_EVERYTHING},
-	width{1280},
-	height{720},
-	validationLayers{"VK_LAYER_KHRONOS_validation"},
+	sdl {SDL_INIT_EVERYTHING},
+	width {1280},
+	height {720},
+	validation_layers {"VK_LAYER_KHRONOS_validation"},
+	physical_device {VK_NULL_HANDLE},
 #ifdef NDEBUG
 	enableValidationLayers(false)
 #else
@@ -16,11 +28,15 @@ Scop::Scop(void) :
 	initVulkan();
 }
 
+/**
+ * Copy constructor.
+ */
 Scop::Scop(const Scop &cpy) :
 	sdl{cpy.sdl},
 	width{cpy.width},
 	height{cpy.height},
-	validationLayers{cpy.validationLayers},
+	validation_layers{cpy.validation_layers},
+	physical_device {VK_NULL_HANDLE},
 #ifdef NDEBUG
 	enableValidationLayers(false)
 #else
@@ -32,21 +48,26 @@ Scop::Scop(const Scop &cpy) :
 	initVulkan();
 }
 
+/**
+ * Class destructor, cleans the class up for destruction.
+ */
 Scop::~Scop(void) noexcept
 {
-	if (enableValidationLayers)
-	{
-		destroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
-	}
-
-	vkDestroyInstance(instance, nullptr);
+	cleanup();
 }
 
+/**
+ * Copy assignement operator. Cleans up Vulkan instance, copy settings and 
+ * initialize Vulkan again. This is here only for Coplien standard form
+ * compliance and should not really have any use at the moment.
+ */
 Scop &Scop::operator=(const Scop &cpy)
 {
+	cleanup();
 	sdl = cpy.sdl;
-	instance = cpy.instance;
-	validationLayers = cpy.validationLayers;
+	validation_layers = cpy.validation_layers;
+	physical_device = cpy.physical_device;
+	initVulkan();
 	return (*this);
 }
 
@@ -93,12 +114,26 @@ void Scop::initVulkan(void)
 {
 	createInstance();
 	setupDebugMessenger();
+	pickPhysicalDevice();
+}
+
+/**
+ * Cleans Vulkan application up before exit or reinitialisation
+ */
+void Scop::cleanup(void)
+{
+	if (enableValidationLayers)
+	{
+		destroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
+	}
+
+	vkDestroyInstance(instance, nullptr);
 }
 
 /**
  * Part of the createInstance() method
  */
-inline void setAppInfo(VkApplicationInfo &app_info)
+static inline void setAppInfo(VkApplicationInfo &app_info)
 {
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	app_info.pApplicationName = "Scop";
@@ -109,10 +144,25 @@ inline void setAppInfo(VkApplicationInfo &app_info)
 }
 
 /**
- * Creates an instance of Vulkan according to given <create_info> and 
- * <allocator>, then assigns the handle to <instance>
+ * Output << operator overload to print VkExtensionProperties.
  */
-inline void createVkInstance(const VkInstanceCreateInfo &create_info,
+std::ostream &operator<<(std::ostream &os, 
+	const std::vector<VkExtensionProperties> &properties)
+{
+	os << "Available extensions:" << std::endl;
+	for (const auto &extension : properties)
+	{
+		os << '\t' << extension.extensionName << std::endl;
+	}
+
+	return (os);
+}
+
+/**
+ * Creates an instance of Vulkan according to given <create_info> and 
+ * <allocator>, then assigns the handle to <instance>.
+ */
+static inline void createVkInstance(const VkInstanceCreateInfo &create_info,
 	const VkAllocationCallbacks *allocator, VkInstance &instance)
 {
 	uint32_t count = 0;
@@ -122,42 +172,42 @@ inline void createVkInstance(const VkInstanceCreateInfo &create_info,
 	std::vector<VkExtensionProperties> properties(count);
 
 	vkEnumerateInstanceExtensionProperties(nullptr, &count, properties.data());
-	// std::cout << "Available extensions:" << std::endl;
-	// for (const auto &extension : properties)
-	// {
-	// 	std::cout << '\t' << extension.extensionName << std::endl;
-	// }
+#ifndef NDEBUG
+	std::cout << properties;
+	std::cout << "\nRequired extension:" << std::endl;
+	for (uint32_t i = 0; i < create_info.enabledExtensionCount; ++i)
+	{
+		std::cout << '\t' << create_info.ppEnabledExtensionNames[i] << '\n';
+	}
 
-	// std::cout << "\nRequired extension:" << std::endl;
-	// for (uint32_t i = 0; i < create_info.enabledExtensionCount; ++i)
-	// {
-	// 	std::cout << '\t' << create_info.ppEnabledExtensionNames[i] << '\n';
-	// }
-
+	std::cout << std::endl;
+#endif
 	if (::vkCreateInstance(&create_info, allocator, &instance) != VK_SUCCESS)
 	{
 		throw (Error("SDL2pp::vkCreateInstance", "failed to create instance"));
 	}
-
-	// std::cout << "Vulkan instance created successfully" << std::endl;
+#ifndef NDEBUG
+	std::cout << "Vulkan instance created successfully\n" << std::endl;
+#endif
 }
 
 /**
  * Set up the nessessary structure to initialize debug utils messenger
  */
-inline void setDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &inf)
+static inline void setDebugMessengerCreateInfo(
+	VkDebugUtilsMessengerCreateInfoEXT &info)
 {
-	inf.messageSeverity =
+	info.messageSeverity =
 		VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
 		| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
 		| VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-	inf.messageType =
+	info.messageType =
 		VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
 		| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
 		| VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-	inf.pfnUserCallback = Scop::debugCallback;
-	inf.pUserData = nullptr;
-	inf.sType =
+	info.pfnUserCallback = Scop::debugCallback;
+	info.pUserData = nullptr;
+	info.sType =
 		VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 }
 
@@ -185,8 +235,8 @@ void Scop::createInstance(void)
 	{
 		setDebugMessengerCreateInfo(debug_info);
 		create_info.enabledLayerCount =
-			static_cast<uint32_t> (validationLayers.size());
-		create_info.ppEnabledLayerNames = validationLayers.data();
+			static_cast<uint32_t> (validation_layers.size());
+		create_info.ppEnabledLayerNames = validation_layers.data();
 		create_info.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debug_info;
 	}
 
@@ -233,7 +283,7 @@ void Scop::destroyDebugUtilsMessengerEXT(
  * Fills the debug messenger structure for further use in the debug utils
  * messenger
  */
-void Scop::setupDebugMessenger()
+void Scop::setupDebugMessenger(void)
 {
 	if (enableValidationLayers)
 	{
@@ -252,8 +302,8 @@ void Scop::setupDebugMessenger()
 /**
  * Part of the checkValidationLayerSupport() method
  */
-inline bool checkPresence(const std::vector<VkLayerProperties> &layerProperties,
-	const char *layerName)
+static inline bool checkPresence(const std::vector<VkLayerProperties>
+	&layerProperties, const char *layerName)
 {
 	for (VkLayerProperties layerPropertie : layerProperties)
 	{
@@ -272,7 +322,7 @@ inline bool checkPresence(const std::vector<VkLayerProperties> &layerProperties,
  * Checks wether required validation layers are supported or not, throws an
  * error if they aren't found
  */
-void Scop::checkValidationLayerSupport()
+void Scop::checkValidationLayerSupport(void)
 {
 	if (enableValidationLayers)
 	{
@@ -283,7 +333,7 @@ void Scop::checkValidationLayerSupport()
 		std::vector<VkLayerProperties> layerProperties {count};
 
 		vkEnumerateInstanceLayerProperties(&count, layerProperties.data());
-		for (const char *layerName : validationLayers)
+		for (const char *layerName : validation_layers)
 		{
 			if (!checkPresence(layerProperties, layerName))
 			{
@@ -294,16 +344,91 @@ void Scop::checkValidationLayerSupport()
 	}
 }
 
+/**
+ * Finds available queue families and checks presence of needed ones.
+ */
+static inline Scop::QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice &dev)
+{
+	Scop::QueueFamilyIndices indices {};
+	uint32_t count {0};
+
+	vkGetPhysicalDeviceQueueFamilyProperties(dev, &count, nullptr);
+
+	std::vector<VkQueueFamilyProperties> properties(count);
+
+	vkGetPhysicalDeviceQueueFamilyProperties(dev, &count, properties.data());
+	for (uint32_t i {0}; i < count; ++i)
+	{
+		if (properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+		{
+			indices.graphics_family = i;
+		}
+
+		if (indices.isComplete())
+		{
+			break ;
+		}
+	}
+
+	return (indices);
+}
+
+/**
+ * Checks if the designated device is suitable for the application's use.
+ */
+static inline bool isDeviceSuitable(const VkPhysicalDevice &device)
+{
+	Scop::QueueFamilyIndices indices {findQueueFamilies(device)};
+
+	return (indices.isComplete());
+}
+
+/**
+ * Picks adapted physical graphic device
+ */
+void Scop::pickPhysicalDevice(void)
+{
+	uint32_t count {0};
+
+	vkEnumeratePhysicalDevices(instance, &count, nullptr);
+
+	if (count == 0)
+	{
+		throw (Error("Scop::pickPhysicalDevice", "No GPU with Vulkan support"));
+	}
+
+	std::vector<VkPhysicalDevice> devices(count);
+
+	vkEnumeratePhysicalDevices(instance, &count, devices.data());
+	for (const auto &device : devices)
+	{
+		if (isDeviceSuitable(device))
+		{
+			physical_device = device;
+			break ;
+		}
+	}
+
+	if (physical_device == VK_NULL_HANDLE)
+	{
+		throw (Error("Scop::pickPhysicalDevice", "No suitable GPU"));
+	}
+}
+
+/**
+ * Custom debug message callback function
+ */
 VKAPI_ATTR VkBool32 VKAPI_CALL Scop::debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT             messageTypes,
     const VkDebugUtilsMessengerCallbackDataEXT  *callback_data,
     void*                                       pUserData
 ) {
-	(void)messageSeverity;
-	(void)messageTypes;
 	(void)pUserData;
-	std::cerr << "Validation layer: " << callback_data->pMessage << std::endl;
+	std::cerr << "Severity: " << messageSeverity << std::endl;
+	std::cerr << "Message type: " << messageTypes << std::endl;
+	std::cerr << "Validation layer: " << callback_data->pMessage;
+	std::cerr << std::endl << std::endl;
 	return (VK_FALSE);
 }
 

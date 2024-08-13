@@ -48,6 +48,9 @@ endif
 $(DOBJ)		:
 				mkdir $@
 
+debug		:
+				$(MAKE) debug=true
+
 clean		:
 				rm -rf $(DOBJ)
 
@@ -56,7 +59,6 @@ fclean		:	clean
 
 re			:	fclean all
 
-debug		:
-				$(MAKE) re debug=true
+redebug		:	fclean debug
 
-.PHONY		:	all clean fclean re
+.PHONY		:	all clean fclean re debug redebug
