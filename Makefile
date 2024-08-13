@@ -56,4 +56,7 @@ fclean		:	clean
 
 re			:	fclean all
 
+debug		:
+				$(MAKE) re debug=true
+
 .PHONY		:	all clean fclean re

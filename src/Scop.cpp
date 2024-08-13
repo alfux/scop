@@ -34,6 +34,11 @@ Scop::Scop(const Scop &cpy) :
 
 Scop::~Scop(void) noexcept
 {
+	if (enableValidationLayers)
+	{
+		destroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
+	}
+
 	vkDestroyInstance(instance, nullptr);
 }
 
@@ -45,6 +50,22 @@ Scop &Scop::operator=(const Scop &cpy)
 	return (*this);
 }
 
+/**
+ * Management of keyboard events
+ */
+static inline bool keyboardEvent(SDL_Keycode &key)
+{
+	if (key == SDLK_ESCAPE)
+	{
+		return (false);
+	}
+
+	return (true);
+}
+
+/**
+ * Management of events
+ */
 bool Scop::manageEvent()
 {
 	SDL_Event event;
@@ -55,18 +76,23 @@ bool Scop::manageEvent()
 		{
 			case SDL_QUIT:
 				return (false);
-				break ;
+			case SDL_KEYDOWN:
+				return (keyboardEvent(event.key.keysym.sym));
 			default:
-				break ;
+				return (true);
 		}
 	}
 
 	return (true);
 }
 
+/**
+ * Initialization of Vulkan
+ */
 void Scop::initVulkan(void)
 {
 	createInstance();
+	setupDebugMessenger();
 }
 
 /**
@@ -116,28 +142,23 @@ inline void createVkInstance(const VkInstanceCreateInfo &create_info,
 	// std::cout << "Vulkan instance created successfully" << std::endl;
 }
 
-void Scop::setupDebugMessenger(void)
+/**
+ * Set up the nessessary structure to initialize debug utils messenger
+ */
+inline void setDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &inf)
 {
-	if (enableValidationLayers)
-	{
-		VkDebugUtilsMessengerCreateInfoEXT create_info {};
-
-		create_info.messageSeverity =
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
-			| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
-			| VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT
-		;
-
-		create_info.messageType =
-			VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
-			| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
-			| VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
-		;
-
-		create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-		create_info.pfnUserCallback = Scop::debugCallback;
-		create_info.pUserData = nullptr;
-	}
+	inf.messageSeverity =
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+		| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+		| VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+	inf.messageType =
+		VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+		| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+		| VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+	inf.pfnUserCallback = Scop::debugCallback;
+	inf.pUserData = nullptr;
+	inf.sType =
+		VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 }
 
 /**
@@ -148,8 +169,9 @@ void Scop::createInstance(void)
 	checkValidationLayerSupport();
 
 	std::vector<const char *> extensions;
-	VkInstanceCreateInfo create_info{};
-	VkApplicationInfo app_info{};
+	VkInstanceCreateInfo create_info {};
+	VkApplicationInfo app_info {};
+	VkDebugUtilsMessengerCreateInfoEXT debug_info {};
 
 	setAppInfo(app_info);
 	sdl.getVulkanExtensions(extensions, enableValidationLayers);
@@ -161,12 +183,70 @@ void Scop::createInstance(void)
 	create_info.enabledLayerCount = 0;
 	if (enableValidationLayers)
 	{
+		setDebugMessengerCreateInfo(debug_info);
 		create_info.enabledLayerCount =
 			static_cast<uint32_t> (validationLayers.size());
 		create_info.ppEnabledLayerNames = validationLayers.data();
+		create_info.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debug_info;
 	}
 
 	createVkInstance(create_info, nullptr, instance);
+}
+
+/**
+ * Gets the debug utils messenger extension function adresss because it needs
+ * to be explicitly loaded by Vulkan
+ */
+VkResult Scop::createDebugUtilsMessengerEXT(
+	VkInstance                               instance,
+	const VkDebugUtilsMessengerCreateInfoEXT *p_create_info,
+	const VkAllocationCallbacks              *p_allocator,
+	VkDebugUtilsMessengerEXT                 *p_debug_messenger
+) {
+	auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>
+		(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+
+	return (
+		func ? func(instance, p_create_info, p_allocator, p_debug_messenger)
+		: VK_ERROR_EXTENSION_NOT_PRESENT
+	);
+}
+
+/**
+ * Same as its counterpart, loads the destroy debug utils messenger function
+ */
+void Scop::destroyDebugUtilsMessengerEXT(
+	VkInstance                  instance,
+	VkDebugUtilsMessengerEXT    p_debug_messenger,
+	const VkAllocationCallbacks *p_allocator
+) {
+	auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>
+		(vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+	
+	if (func)
+	{
+		func(instance, p_debug_messenger, p_allocator);
+	}
+}
+
+/**
+ * Fills the debug messenger structure for further use in the debug utils
+ * messenger
+ */
+void Scop::setupDebugMessenger()
+{
+	if (enableValidationLayers)
+	{
+		VkDebugUtilsMessengerCreateInfoEXT create_info {};
+
+		setDebugMessengerCreateInfo(create_info);
+		if (createDebugUtilsMessengerEXT(instance, &create_info,
+			nullptr, &debug_messenger) != VK_SUCCESS)
+		{
+			throw (Error("Scop::setupDebugMessenger",
+				"failed to set up debug messenger"));
+		}
+	}
 }
 
 /**

@@ -11,13 +11,14 @@ class Scop
 {
 	SDL2pp sdl;
 
-	VkInstance instance;
-	VkDebugUtilsMessengerEXT debug_messenger;
-
 	const uint32_t width;
 	const uint32_t height;
 
 	std::vector<const char *> validationLayers;
+
+	VkInstance instance;
+	VkDebugUtilsMessengerEXT debug_messenger;
+
 
 	const bool enableValidationLayers;
 
@@ -31,8 +32,22 @@ class Scop
 		bool manageEvent(void);
 		void initVulkan(void);
 		void createInstance(void);
-		void checkValidationLayerSupport();
+		void setupDebugMessenger();
+		void checkValidationLayerSupport(void);		
 		void mainLoop(void);
+
+		static VkResult createDebugUtilsMessengerEXT(
+			VkInstance                               instance,
+			const VkDebugUtilsMessengerCreateInfoEXT *p_create_info,
+			const VkAllocationCallbacks              *p_allocator,
+			VkDebugUtilsMessengerEXT                 *p_debug_messenger
+		);
+
+		static void destroyDebugUtilsMessengerEXT(
+			VkInstance                  instance,
+			VkDebugUtilsMessengerEXT    p_debug_messenger,
+			const VkAllocationCallbacks *p_allocator
+		);
 
 		static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     		VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
