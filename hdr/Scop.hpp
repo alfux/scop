@@ -20,6 +20,8 @@ class Scop
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
 	VkPhysicalDevice physical_device;
+	VkDevice device;
+	VkQueue graphics_queue;
 
 	const bool enableValidationLayers;
 
@@ -44,6 +46,7 @@ class Scop
 		void setupDebugMessenger(void);
 		void checkValidationLayerSupport(void);
 		void pickPhysicalDevice(void);
+		void createLogicalDevice(void);
 		void mainLoop(void);
 
 		static VkResult createDebugUtilsMessengerEXT(

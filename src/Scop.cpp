@@ -115,6 +115,7 @@ void Scop::initVulkan(void)
 	createInstance();
 	setupDebugMessenger();
 	pickPhysicalDevice();
+	createLogicalDevice();
 }
 
 /**
@@ -122,6 +123,7 @@ void Scop::initVulkan(void)
  */
 void Scop::cleanup(void)
 {
+	vkDestroyDevice(device, nullptr);
 	if (enableValidationLayers)
 	{
 		destroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
@@ -172,16 +174,6 @@ static inline void createVkInstance(const VkInstanceCreateInfo &create_info,
 	std::vector<VkExtensionProperties> properties(count);
 
 	vkEnumerateInstanceExtensionProperties(nullptr, &count, properties.data());
-#ifndef NDEBUG
-	std::cout << properties;
-	std::cout << "\nRequired extension:" << std::endl;
-	for (uint32_t i = 0; i < create_info.enabledExtensionCount; ++i)
-	{
-		std::cout << '\t' << create_info.ppEnabledExtensionNames[i] << '\n';
-	}
-
-	std::cout << std::endl;
-#endif
 	if (::vkCreateInstance(&create_info, allocator, &instance) != VK_SUCCESS)
 	{
 		throw (Error("SDL2pp::vkCreateInstance", "failed to create instance"));
@@ -400,11 +392,11 @@ void Scop::pickPhysicalDevice(void)
 	std::vector<VkPhysicalDevice> devices(count);
 
 	vkEnumeratePhysicalDevices(instance, &count, devices.data());
-	for (const auto &device : devices)
+	for (const auto &dev : devices)
 	{
-		if (isDeviceSuitable(device))
+		if (isDeviceSuitable(dev))
 		{
-			physical_device = device;
+			physical_device = dev;
 			break ;
 		}
 	}
@@ -413,6 +405,78 @@ void Scop::pickPhysicalDevice(void)
 	{
 		throw (Error("Scop::pickPhysicalDevice", "No suitable GPU"));
 	}
+}
+
+/**
+ * Set queue create info properties.
+ */
+static inline void setQueueCreateInfo(VkDeviceQueueCreateInfo &create_info,
+	Scop::QueueFamilyIndices indices)
+{
+	float queue_priority {1.0f};
+
+	create_info.pQueuePriorities = &queue_priority;
+	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+	create_info.queueFamilyIndex = indices.graphics_family.value();
+	create_info.queueCount = 1;
+}
+
+/**
+ * Sets the VkDeviceCreateInfo structure's informations up to create the
+ * logical device.
+ */
+static inline void setDeviceCreateInfo(
+	VkDeviceCreateInfo        &create_info,
+	VkDeviceQueueCreateInfo   &queue_create_info,
+	VkPhysicalDeviceFeatures  &features,
+	Scop::QueueFamilyIndices  &indices,
+	std::vector<const char *> &portability_subset,
+	VkPhysicalDevice          &physical_device,
+	std::vector<const char *> &validation_layers,
+	bool                      enableValidationLayers
+) {
+
+	setQueueCreateInfo(queue_create_info, indices);
+	vkGetPhysicalDeviceFeatures(physical_device, &features);
+	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	create_info.pQueueCreateInfos = &queue_create_info;
+	create_info.queueCreateInfoCount = 1;
+	create_info.pEnabledFeatures = &features;
+	create_info.enabledExtensionCount = portability_subset.size();
+	create_info.ppEnabledExtensionNames = portability_subset.data();
+	if (enableValidationLayers)
+	{
+		create_info.enabledLayerCount =
+			static_cast<uint32_t> (validation_layers.size());
+		create_info.ppEnabledLayerNames = validation_layers.data();
+	}
+}
+
+/**
+ * Creates an instance of a logical device.
+ */
+void Scop::createLogicalDevice(void)
+{
+	VkDeviceCreateInfo create_info {};
+	VkDeviceQueueCreateInfo queue_create_info {};
+	VkPhysicalDeviceFeatures features {};
+	Scop::QueueFamilyIndices indices {findQueueFamilies(physical_device)};
+	std::vector<const char *> portability_subset {1};
+
+	portability_subset[0] = VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
+	setDeviceCreateInfo(
+		create_info, queue_create_info, features, indices, portability_subset,
+		physical_device, validation_layers, enableValidationLayers
+	);
+
+	if (vkCreateDevice(physical_device, &create_info, nullptr, &device)
+		 != VK_SUCCESS)
+	{
+		throw (Error("Scop::createLogicalDevice", "failed creation"));
+	}
+
+	vkGetDeviceQueue(device, indices.graphics_family.value(),
+		0, &graphics_queue);
 }
 
 /**
@@ -427,8 +491,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Scop::debugCallback(
 	(void)pUserData;
 	std::cerr << "Severity: " << messageSeverity << std::endl;
 	std::cerr << "Message type: " << messageTypes << std::endl;
-	std::cerr << "Validation layer: " << callback_data->pMessage;
-	std::cerr << std::endl << std::endl;
+	std::cerr << "Validation layer: " << std::endl << "\t";
+	std::cerr << callback_data->pMessage << std::endl << std::endl;
 	return (VK_FALSE);
 }
 

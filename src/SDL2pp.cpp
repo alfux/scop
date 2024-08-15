@@ -122,10 +122,11 @@ void SDL2pp::getVulkanExtensions(std::vector<const char *> &names, bool debug)
 		throw (Error("SDL2pp::getVulkanExtensions", "can't get pCount"));
 	}
 
-	names.resize(count + 1);
+	names.resize(count + 2);
 	names[0] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
+	names[1] = VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
 
-	if (!SDL_Vulkan_GetInstanceExtensions(window, &count, names.data() + 1))
+	if (!SDL_Vulkan_GetInstanceExtensions(window, &count, names.data() + 2))
 	{
 		throw (Error("SDL2pp::getVulkanExtensions", "can't get pNames"));
 	}
