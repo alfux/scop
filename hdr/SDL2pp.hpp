@@ -28,6 +28,7 @@ class SDL2pp
 		SDL2pp &operator=(SDL2pp const &cpy);
 
 		void addWindow(char const *t, int x, int y, int w, int h, Uint32 flags);
+		void vkCreateSurface(VkInstance &instance, VkSurfaceKHR &surface);
 		void destroyWindow(void);
 		int pollEvent(SDL_Event *event);
 		void getVulkanExtensions(std::vector<const char *> &names,

@@ -7,28 +7,33 @@
 # include <SDL2pp.hpp>
 # include <cstring>
 # include <optional>
+# include <set>
 
 class Scop
 {
-	SDL2pp sdl;
+	private:
+		SDL2pp sdl;
 
-	const uint32_t width;
-	const uint32_t height;
+		const uint32_t width;
+		const uint32_t height;
 
-	std::vector<const char *> validation_layers;
+		std::vector<const char *> validation_layers;
 
-	VkInstance instance;
-	VkDebugUtilsMessengerEXT debug_messenger;
-	VkPhysicalDevice physical_device;
-	VkDevice device;
-	VkQueue graphics_queue;
+		VkInstance instance;
+		VkDebugUtilsMessengerEXT debug_messenger;
+		VkPhysicalDevice physical_device;
+		VkDevice device;
+		VkQueue graphic_queue;
+		VkQueue present_queue;
+		VkSurfaceKHR surface;
 
-	const bool enableValidationLayers;
+		const bool enableValidationLayers;
 
 	public:
 		struct QueueFamilyIndices
 		{
-			std::optional<uint32_t> graphics_family;
+			std::optional<uint32_t> graphic_family;
+			std::optional<uint32_t> present_family;
 
 			bool isComplete();
 		};
@@ -44,8 +49,11 @@ class Scop
 		void cleanup(void);
 		void createInstance(void);
 		void setupDebugMessenger(void);
+		void createSurface(void);
 		void checkValidationLayerSupport(void);
 		void pickPhysicalDevice(void);
+		bool isDeviceSuitable(const VkPhysicalDevice &device);
+		QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice &device);
 		void createLogicalDevice(void);
 		void mainLoop(void);
 

@@ -5,7 +5,7 @@
  */
 bool Scop::QueueFamilyIndices::isComplete(void)
 {
-	return (graphics_family.has_value());
+	return (graphic_family.has_value() && present_family.has_value());
 }
 
 /**
@@ -114,6 +114,7 @@ void Scop::initVulkan(void)
 {
 	createInstance();
 	setupDebugMessenger();
+	createSurface();
 	pickPhysicalDevice();
 	createLogicalDevice();
 }
@@ -129,6 +130,7 @@ void Scop::cleanup(void)
 		destroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
 	}
 
+	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
 }
 
@@ -143,21 +145,6 @@ static inline void setAppInfo(VkApplicationInfo &app_info)
 	app_info.pEngineName = "No Engine";
 	app_info.engineVersion = VK_MAKE_API_VERSION(1, 0, 0, 0);
 	app_info.apiVersion = VK_API_VERSION_1_0;
-}
-
-/**
- * Output << operator overload to print VkExtensionProperties.
- */
-std::ostream &operator<<(std::ostream &os, 
-	const std::vector<VkExtensionProperties> &properties)
-{
-	os << "Available extensions:" << std::endl;
-	for (const auto &extension : properties)
-	{
-		os << '\t' << extension.extensionName << std::endl;
-	}
-
-	return (os);
 }
 
 /**
@@ -178,9 +165,6 @@ static inline void createVkInstance(const VkInstanceCreateInfo &create_info,
 	{
 		throw (Error("SDL2pp::vkCreateInstance", "failed to create instance"));
 	}
-#ifndef NDEBUG
-	std::cout << "Vulkan instance created successfully\n" << std::endl;
-#endif
 }
 
 /**
@@ -291,6 +275,11 @@ void Scop::setupDebugMessenger(void)
 	}
 }
 
+void Scop::createSurface(void)
+{
+	sdl.vkCreateSurface(instance, surface);
+}
+
 /**
  * Part of the checkValidationLayerSupport() method
  */
@@ -337,25 +326,54 @@ void Scop::checkValidationLayerSupport(void)
 }
 
 /**
+ * Checks if the given queue family property contains the graphic bit flag
+ * and sets <indices> structure according to the result
+ */
+static inline void checkGraphicSupport(VkQueueFamilyProperties &property,
+	uint32_t i, Scop::QueueFamilyIndices &indices)
+{
+	if (property.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+	{
+		indices.graphic_family = i;
+	}
+}
+
+/**
+ * Checks if the queue family from <physical_device> at index <i> supports
+ * presenting to window surface <surface> and sets <indices> structure
+ * according to the result
+ */
+static inline void checkPresentSupport(const VkPhysicalDevice &device,
+	uint32_t i, VkSurfaceKHR &surface, Scop::QueueFamilyIndices &indices)
+{
+	VkBool32 support {false};
+
+	vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &support);
+	if (support)
+	{
+		indices.present_family = i;
+	}
+}
+
+/**
  * Finds available queue families and checks presence of needed ones.
  */
-static inline Scop::QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice &dev)
+Scop::QueueFamilyIndices Scop::findQueueFamilies(
+	const VkPhysicalDevice &tested_device)
 {
 	Scop::QueueFamilyIndices indices {};
 	uint32_t count {0};
 
-	vkGetPhysicalDeviceQueueFamilyProperties(dev, &count, nullptr);
+	vkGetPhysicalDeviceQueueFamilyProperties(tested_device, &count, nullptr);
 
 	std::vector<VkQueueFamilyProperties> properties(count);
 
-	vkGetPhysicalDeviceQueueFamilyProperties(dev, &count, properties.data());
+	vkGetPhysicalDeviceQueueFamilyProperties(tested_device, &count,
+		properties.data());
 	for (uint32_t i {0}; i < count; ++i)
 	{
-		if (properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-		{
-			indices.graphics_family = i;
-		}
-
+		checkGraphicSupport(properties[i], i, indices);
+		checkPresentSupport(tested_device, i, surface, indices);
 		if (indices.isComplete())
 		{
 			break ;
@@ -368,9 +386,9 @@ static inline Scop::QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice 
 /**
  * Checks if the designated device is suitable for the application's use.
  */
-static inline bool isDeviceSuitable(const VkPhysicalDevice &device)
+bool Scop::isDeviceSuitable(const VkPhysicalDevice &tested_device)
 {
-	Scop::QueueFamilyIndices indices {findQueueFamilies(device)};
+	Scop::QueueFamilyIndices indices {findQueueFamilies(tested_device)};
 
 	return (indices.isComplete());
 }
@@ -410,15 +428,27 @@ void Scop::pickPhysicalDevice(void)
 /**
  * Set queue create info properties.
  */
-static inline void setQueueCreateInfo(VkDeviceQueueCreateInfo &create_info,
-	Scop::QueueFamilyIndices indices)
-{
+static inline void setQueueCreateInfo(
+	std::vector<VkDeviceQueueCreateInfo> &create_infos,
+	Scop::QueueFamilyIndices             &indices
+) {
+	std::set<uint32_t> uniqueQueueFamily {
+		indices.graphic_family.value(),
+		indices.present_family.value()
+	};
+
 	float queue_priority {1.0f};
 
-	create_info.pQueuePriorities = &queue_priority;
-	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	create_info.queueFamilyIndex = indices.graphics_family.value();
-	create_info.queueCount = 1;
+	for (uint32_t queueFamily : uniqueQueueFamily)
+	{
+		VkDeviceQueueCreateInfo create_info {};
+
+		create_info.pQueuePriorities = &queue_priority;
+		create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		create_info.queueFamilyIndex = queueFamily;
+		create_info.queueCount = 1;
+		create_infos.push_back(create_info);
+	}
 }
 
 /**
@@ -426,21 +456,21 @@ static inline void setQueueCreateInfo(VkDeviceQueueCreateInfo &create_info,
  * logical device.
  */
 static inline void setDeviceCreateInfo(
-	VkDeviceCreateInfo        &create_info,
-	VkDeviceQueueCreateInfo   &queue_create_info,
-	VkPhysicalDeviceFeatures  &features,
-	Scop::QueueFamilyIndices  &indices,
-	std::vector<const char *> &portability_subset,
-	VkPhysicalDevice          &physical_device,
-	std::vector<const char *> &validation_layers,
-	bool                      enableValidationLayers
+	VkDeviceCreateInfo                     &create_info,
+	std::vector<VkDeviceQueueCreateInfo>   &queue_create_info,
+	VkPhysicalDeviceFeatures               &features,
+	Scop::QueueFamilyIndices               &indices,
+	std::vector<const char *>              &portability_subset,
+	VkPhysicalDevice                       &physical_device,
+	std::vector<const char *>              &validation_layers,
+	bool                                   enableValidationLayers
 ) {
-
 	setQueueCreateInfo(queue_create_info, indices);
 	vkGetPhysicalDeviceFeatures(physical_device, &features);
 	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	create_info.pQueueCreateInfos = &queue_create_info;
-	create_info.queueCreateInfoCount = 1;
+	create_info.pQueueCreateInfos = queue_create_info.data();
+	create_info.queueCreateInfoCount =
+		static_cast<uint32_t> (queue_create_info.size());
 	create_info.pEnabledFeatures = &features;
 	create_info.enabledExtensionCount = portability_subset.size();
 	create_info.ppEnabledExtensionNames = portability_subset.data();
@@ -458,7 +488,7 @@ static inline void setDeviceCreateInfo(
 void Scop::createLogicalDevice(void)
 {
 	VkDeviceCreateInfo create_info {};
-	VkDeviceQueueCreateInfo queue_create_info {};
+	std::vector<VkDeviceQueueCreateInfo> queue_create_info {};
 	VkPhysicalDeviceFeatures features {};
 	Scop::QueueFamilyIndices indices {findQueueFamilies(physical_device)};
 	std::vector<const char *> portability_subset {1};
@@ -475,8 +505,8 @@ void Scop::createLogicalDevice(void)
 		throw (Error("Scop::createLogicalDevice", "failed creation"));
 	}
 
-	vkGetDeviceQueue(device, indices.graphics_family.value(),
-		0, &graphics_queue);
+	vkGetDeviceQueue(device, indices.graphic_family.value(), 0, &graphic_queue);
+	vkGetDeviceQueue(device, indices.present_family.value(), 0, &present_queue);
 }
 
 /**

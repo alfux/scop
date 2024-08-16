@@ -94,6 +94,17 @@ void SDL2pp::addWindow(const char *t, int x, int y, int w, int h, Uint32 flags)
 }
 
 /**
+ * SDL_Vulkan
+ */
+void SDL2pp::vkCreateSurface(VkInstance &instance, VkSurfaceKHR &surface)
+{
+	if (SDL_Vulkan_CreateSurface(window, instance, &surface) != SDL_TRUE)
+	{
+		throw (Error("SDL2pp::vkCreateSurface", SDL_GetError()));
+	}
+}
+
+/**
  * Destroys window
  */
 void SDL2pp::destroyWindow()
@@ -134,5 +145,11 @@ void SDL2pp::getVulkanExtensions(std::vector<const char *> &names, bool debug)
 	if (debug)
 	{
 		names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+		std::cerr << "SDL Vulkan extension names:" << std::endl;
+		for (const auto &name : names)
+		{
+			std::cerr << "\t" << name << std::endl;
+		}
+		std::cerr << std::endl;
 	}
 }
