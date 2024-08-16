@@ -38,7 +38,6 @@ class Scop
 
 			bool isComplete();
 		};
-
 		struct SwapChainSupportDetails
 		{
 			VkSurfaceCapabilitiesKHR capabilities;
@@ -63,7 +62,15 @@ class Scop
 		bool isDeviceSuitable(const VkPhysicalDevice &device);
 		QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice &device);
 		bool checkDeviceExtensionSupport(const VkPhysicalDevice &device);
-		SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice &device);
+		SwapChainSupportDetails querySwapChainSupport(
+			const VkPhysicalDevice &device);
+		VkSurfaceFormatKHR chooseSwapSurfaceFormat(
+			const std::vector<VkSurfaceFormatKHR> &available_formats);
+		VkPresentModeKHR chooseSwapPresentMode(
+			const std::vector<VkPresentModeKHR> &available_modes);
+		VkExtent2D chooseSwapExtent(
+			const VkSurfaceCapabilitiesKHR &capabilities);
+		void createSwapChain(void);
 		void createLogicalDevice(void);
 		void mainLoop(void);
 
@@ -73,13 +80,11 @@ class Scop
 			const VkAllocationCallbacks              *p_allocator,
 			VkDebugUtilsMessengerEXT                 *p_debug_messenger
 		);
-
 		static void destroyDebugUtilsMessengerEXT(
 			VkInstance                  instance,
 			VkDebugUtilsMessengerEXT    p_debug_messenger,
 			const VkAllocationCallbacks *p_allocator
 		);
-
 		static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     		VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
     		VkDebugUtilsMessageTypeFlagsEXT             messageTypes,

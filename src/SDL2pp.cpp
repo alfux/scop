@@ -81,6 +81,7 @@ SDL2pp	&SDL2pp::operator=(SDL2pp const &cpy)
 	return (*this);
 }
 
+#include <limits>
 /**
  * Creates specified window
  */
@@ -91,6 +92,15 @@ void SDL2pp::addWindow(const char *t, int x, int y, int w, int h, Uint32 flags)
 	{
 		throw (Error("addWindow", SDL_GetError()));
 	}
+}
+
+/**
+ * Fills <width> and <height> variables with the corresponding pixel sizes
+ * of the window
+ */
+void SDL2pp::getWindowPixelResolution(int *width, int *height)
+{
+	SDL_GL_GetDrawableSize(window, width, height);
 }
 
 /**

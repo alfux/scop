@@ -13,8 +13,8 @@ bool Scop::QueueFamilyIndices::isComplete(void)
  */
 Scop::Scop(void) :
 	sdl {SDL_INIT_EVERYTHING},
-	width {1280},
-	height {720},
+	width {SCOP_WINDOW_WIDTH},
+	height {SCOP_WINDOW_HEIGHT},
 	validation_layers {"VK_LAYER_KHRONOS_validation"},
 	device_extensions {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME},
@@ -25,8 +25,14 @@ Scop::Scop(void) :
 	enableValidationLayers(true)
 #endif
 {
-	sdl.addWindow("scop", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		SCOP_WINDOW_WIDTH, SCOP_WINDOW_HEIGHT, SDL_WINDOW_VULKAN);
+	sdl.addWindow(
+		"scop",
+		SDL_WINDOWPOS_CENTERED,
+		SDL_WINDOWPOS_CENTERED,
+		SCOP_WINDOW_WIDTH,
+		SCOP_WINDOW_HEIGHT,
+		SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI
+	);
 	initVulkan();
 }
 
@@ -46,8 +52,14 @@ Scop::Scop(const Scop &cpy) :
 	enableValidationLayers(true)
 #endif
 {
-	sdl.addWindow("scop", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		SCOP_WINDOW_WIDTH, SCOP_WINDOW_HEIGHT, SDL_WINDOW_VULKAN);
+	sdl.addWindow(
+		"scop",
+		SDL_WINDOWPOS_CENTERED,
+		SDL_WINDOWPOS_CENTERED,
+		SCOP_WINDOW_WIDTH,
+		SCOP_WINDOW_HEIGHT,
+		SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI
+	);
 	initVulkan();
 }
 
@@ -84,7 +96,6 @@ static inline bool keyboardEvent(SDL_Keycode &key)
 	{
 		return (false);
 	}
-
 	return (true);
 }
 
@@ -107,7 +118,6 @@ bool Scop::manageEvent()
 				return (true);
 		}
 	}
-
 	return (true);
 }
 
@@ -121,6 +131,7 @@ void Scop::initVulkan(void)
 	createSurface();
 	pickPhysicalDevice();
 	createLogicalDevice();
+	createSwapChain();
 }
 
 /**
@@ -133,7 +144,6 @@ void Scop::cleanup(void)
 	{
 		destroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
 	}
-
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
 }
@@ -219,7 +229,6 @@ void Scop::createInstance(void)
 		create_info.ppEnabledLayerNames = validation_layers.data();
 		create_info.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debug_info;
 	}
-
 	createVkInstance(create_info, nullptr, instance);
 }
 
@@ -299,7 +308,6 @@ static inline bool checkPresence(const std::vector<VkLayerProperties>
 			return (true);
 		}
 	}
-
 	return (false);
 }
 
@@ -367,7 +375,6 @@ void Scop::pickPhysicalDevice(void)
 	uint32_t count {0};
 
 	vkEnumeratePhysicalDevices(instance, &count, nullptr);
-
 	if (count == 0)
 	{
 		throw (Error("Scop::pickPhysicalDevice", "No GPU with Vulkan support"));
@@ -384,7 +391,6 @@ void Scop::pickPhysicalDevice(void)
 			break ;
 		}
 	}
-
 	if (physical_device == VK_NULL_HANDLE)
 	{
 		throw (Error("Scop::pickPhysicalDevice", "No suitable GPU"));
@@ -394,12 +400,18 @@ void Scop::pickPhysicalDevice(void)
 /**
  * Checks if the designated device is suitable for the application's use.
  */
-bool Scop::isDeviceSuitable(const VkPhysicalDevice &tested_device)
+bool Scop::isDeviceSuitable(const VkPhysicalDevice &device)
 {
-	Scop::QueueFamilyIndices indices {findQueueFamilies(tested_device)};
-	bool extensionSupported {checkDeviceExtensionSupport(tested_device)};
+	Scop::QueueFamilyIndices indices {findQueueFamilies(device)};
+	bool extensionSupported {checkDeviceExtensionSupport(device)};
+	bool swapChainAdequate {false};
 
-	return (indices.isComplete() && extensionSupported);
+	if (extensionSupported)
+	{
+		Scop::SwapChainSupportDetails details {querySwapChainSupport(device)};
+		swapChainAdequate = !details.formats.empty() && !details.modes.empty();
+	}
+	return (indices.isComplete() && extensionSupported && swapChainAdequate);
 }
 
 /**
@@ -426,7 +438,6 @@ Scop::QueueFamilyIndices Scop::findQueueFamilies(
 			break ;
 		}
 	}
-
 	return (indices);
 }
 
@@ -452,8 +463,129 @@ bool Scop::checkDeviceExtensionSupport(const VkPhysicalDevice &tested_device)
 	{
 		required_extensions.erase(extension.extensionName);
 	}
-
 	return (required_extensions.empty());
+}
+
+/**
+ * Fills the SwapChainSupportDetails structure with information about available
+ * features of the device swap chains
+ */
+Scop::SwapChainSupportDetails Scop::querySwapChainSupport(
+	const VkPhysicalDevice &dev)
+{
+	Scop::SwapChainSupportDetails details {};
+
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(dev, surface,
+		&details.capabilities);
+	
+	uint32_t count {0};
+
+	vkGetPhysicalDeviceSurfaceFormatsKHR(dev, surface, &count, nullptr);
+	if (count != 0)
+	{
+		details.formats.resize(count);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(dev, surface, &count,
+			details.formats.data());
+	}
+	vkGetPhysicalDeviceSurfacePresentModesKHR(dev, surface, &count, nullptr);
+	if (count != 0)
+	{
+		details.modes.resize(count);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(dev, surface, &count,
+			details.modes.data());
+	}
+	return (details);
+}
+
+/**
+ * Choose the best suitable format for the swap chain.
+ */
+VkSurfaceFormatKHR Scop::chooseSwapSurfaceFormat(
+	const std::vector<VkSurfaceFormatKHR> &available_formats)
+{
+	for (const auto &format : available_formats)
+	{
+		if (format.format == VK_FORMAT_B8G8R8A8_SRGB
+			&& format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+		{
+			return (format);
+		}
+	}
+	return (available_formats[0]);
+}
+
+/**
+ * Choose the best suitable mode for the swap chain. FIFO is the default,
+ * MAILBOX is like FIFO but instead of blocking when the chain is full, it
+ * replaces images by the newer ones
+ */
+VkPresentModeKHR Scop::chooseSwapPresentMode(
+	const std::vector<VkPresentModeKHR> &available_modes)
+{
+	for (const auto &mode : available_modes)
+	{
+		if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
+		{
+			return (mode);
+		}
+	}
+	return (VK_PRESENT_MODE_FIFO_KHR);
+}
+
+/**
+ * Quick inlined clamp function
+ */
+static inline uint32_t clampValue(uint32_t value, uint32_t min, uint32_t max)
+{
+	if (value <= min)
+	{
+		return (min);
+	}
+	if (value >= max)
+	{
+		return (max);
+	}
+	return (value);
+}
+
+/**
+ * Choose the best image resolution in the swap chain, either by default if 
+ * Vulkan sets values or with the window manager values if it is allowed by the
+ * uint32_t max special value in the capabilities structure set by Vulkan.
+ */
+VkExtent2D Scop::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
+{
+	if (capabilities.currentExtent.width != static_cast<uint32_t> (-1))
+	{
+		return (capabilities.currentExtent);
+	}
+	
+	int width {0};
+	int height {0};
+
+	sdl.getWindowPixelResolution(&width, &height);
+
+	VkExtent2D actual_extent {
+		static_cast<uint32_t> (width),
+		static_cast<uint32_t> (height)
+	};
+
+	actual_extent.width = clampValue(actual_extent.width,
+		capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+	actual_extent.height = clampValue(actual_extent.height,
+		capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+	return (actual_extent);
+}
+
+void Scop::createSwapChain(void)
+{
+	Scop::SwapChainSupportDetails swap_chain_support
+		{querySwapChainSupport(physical_device)};
+	VkSurfaceFormatKHR surface_format =
+		chooseSwapSurfaceFormat(swap_chain_support.formats);
+	VkPresentModeKHR present_mode =
+		chooseSwapPresentMode(swap_chain_support.modes);
+	VkExtent2D extent = chooseSwapExtent(swap_chain_support.capabilities);
 }
 
 /**
@@ -514,11 +646,6 @@ static inline void setDeviceCreateInfo(
 	}
 }
 
-Scop::SwapChainSupportDetails Scop::querySwapChainSupport(VkPhysicalDevice &dev)
-{
-	
-}
-
 /**
  * Creates an instance of a logical device.
  */
@@ -538,13 +665,11 @@ void Scop::createLogicalDevice(void)
 		validation_layers,
 		enableValidationLayers
 	);
-
 	if (vkCreateDevice(physical_device, &create_info, nullptr, &device)
 		 != VK_SUCCESS)
 	{
 		throw (Error("Scop::createLogicalDevice", "failed creation"));
 	}
-
 	vkGetDeviceQueue(device, indices.graphic_family.value(), 0, &graphic_queue);
 	vkGetDeviceQueue(device, indices.present_family.value(), 0, &present_queue);
 }
