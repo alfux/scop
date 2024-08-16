@@ -16,6 +16,8 @@ Scop::Scop(void) :
 	width {1280},
 	height {720},
 	validation_layers {"VK_LAYER_KHRONOS_validation"},
+	device_extensions {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME},
 	physical_device {VK_NULL_HANDLE},
 #ifdef NDEBUG
 	enableValidationLayers(false)
@@ -36,6 +38,7 @@ Scop::Scop(const Scop &cpy) :
 	width{cpy.width},
 	height{cpy.height},
 	validation_layers{cpy.validation_layers},
+	device_extensions {cpy.device_extensions},
 	physical_device {VK_NULL_HANDLE},
 #ifdef NDEBUG
 	enableValidationLayers(false)
@@ -66,6 +69,7 @@ Scop &Scop::operator=(const Scop &cpy)
 	cleanup();
 	sdl = cpy.sdl;
 	validation_layers = cpy.validation_layers;
+	device_extensions = cpy.device_extensions;
 	physical_device = cpy.physical_device;
 	initVulkan();
 	return (*this);
@@ -356,44 +360,6 @@ static inline void checkPresentSupport(const VkPhysicalDevice &device,
 }
 
 /**
- * Finds available queue families and checks presence of needed ones.
- */
-Scop::QueueFamilyIndices Scop::findQueueFamilies(
-	const VkPhysicalDevice &tested_device)
-{
-	Scop::QueueFamilyIndices indices {};
-	uint32_t count {0};
-
-	vkGetPhysicalDeviceQueueFamilyProperties(tested_device, &count, nullptr);
-
-	std::vector<VkQueueFamilyProperties> properties(count);
-
-	vkGetPhysicalDeviceQueueFamilyProperties(tested_device, &count,
-		properties.data());
-	for (uint32_t i {0}; i < count; ++i)
-	{
-		checkGraphicSupport(properties[i], i, indices);
-		checkPresentSupport(tested_device, i, surface, indices);
-		if (indices.isComplete())
-		{
-			break ;
-		}
-	}
-
-	return (indices);
-}
-
-/**
- * Checks if the designated device is suitable for the application's use.
- */
-bool Scop::isDeviceSuitable(const VkPhysicalDevice &tested_device)
-{
-	Scop::QueueFamilyIndices indices {findQueueFamilies(tested_device)};
-
-	return (indices.isComplete());
-}
-
-/**
  * Picks adapted physical graphic device
  */
 void Scop::pickPhysicalDevice(void)
@@ -423,6 +389,71 @@ void Scop::pickPhysicalDevice(void)
 	{
 		throw (Error("Scop::pickPhysicalDevice", "No suitable GPU"));
 	}
+}
+
+/**
+ * Checks if the designated device is suitable for the application's use.
+ */
+bool Scop::isDeviceSuitable(const VkPhysicalDevice &tested_device)
+{
+	Scop::QueueFamilyIndices indices {findQueueFamilies(tested_device)};
+	bool extensionSupported {checkDeviceExtensionSupport(tested_device)};
+
+	return (indices.isComplete() && extensionSupported);
+}
+
+/**
+ * Finds available queue families and checks presence of needed ones.
+ */
+Scop::QueueFamilyIndices Scop::findQueueFamilies(
+	const VkPhysicalDevice &tested_device)
+{
+	Scop::QueueFamilyIndices indices {};
+	uint32_t count {0};
+
+	vkGetPhysicalDeviceQueueFamilyProperties(tested_device, &count, nullptr);
+
+	std::vector<VkQueueFamilyProperties> properties(count);
+
+	vkGetPhysicalDeviceQueueFamilyProperties(tested_device, &count,
+		properties.data());
+	for (uint32_t i {0}; i < count; ++i)
+	{
+		checkGraphicSupport(properties[i], i, indices);
+		checkPresentSupport(tested_device, i, surface, indices);
+		if (indices.isComplete())
+		{
+			break ;
+		}
+	}
+
+	return (indices);
+}
+
+/**
+ * Checks if the device supports required extensions
+ */
+bool Scop::checkDeviceExtensionSupport(const VkPhysicalDevice &tested_device)
+{
+	uint32_t count;
+
+	vkEnumerateDeviceExtensionProperties(tested_device, nullptr,
+		&count, nullptr);
+
+	std::vector<VkExtensionProperties> available_extensions {count};
+
+	vkEnumerateDeviceExtensionProperties(tested_device, nullptr,
+		&count, available_extensions.data());
+	
+	std::set<std::string> required_extensions {device_extensions.begin(),
+		device_extensions.end()};
+
+	for (const auto &extension : available_extensions)
+	{
+		required_extensions.erase(extension.extensionName);
+	}
+
+	return (required_extensions.empty());
 }
 
 /**
@@ -460,8 +491,8 @@ static inline void setDeviceCreateInfo(
 	std::vector<VkDeviceQueueCreateInfo>   &queue_create_info,
 	VkPhysicalDeviceFeatures               &features,
 	Scop::QueueFamilyIndices               &indices,
-	std::vector<const char *>              &portability_subset,
 	VkPhysicalDevice                       &physical_device,
+	std::vector<const char *>              &device_extensions,
 	std::vector<const char *>              &validation_layers,
 	bool                                   enableValidationLayers
 ) {
@@ -472,8 +503,9 @@ static inline void setDeviceCreateInfo(
 	create_info.queueCreateInfoCount =
 		static_cast<uint32_t> (queue_create_info.size());
 	create_info.pEnabledFeatures = &features;
-	create_info.enabledExtensionCount = portability_subset.size();
-	create_info.ppEnabledExtensionNames = portability_subset.data();
+	create_info.enabledExtensionCount =
+		static_cast<uint32_t> (device_extensions.size());
+	create_info.ppEnabledExtensionNames = device_extensions.data();
 	if (enableValidationLayers)
 	{
 		create_info.enabledLayerCount =
@@ -491,12 +523,15 @@ void Scop::createLogicalDevice(void)
 	std::vector<VkDeviceQueueCreateInfo> queue_create_info {};
 	VkPhysicalDeviceFeatures features {};
 	Scop::QueueFamilyIndices indices {findQueueFamilies(physical_device)};
-	std::vector<const char *> portability_subset {1};
 
-	portability_subset[0] = VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
 	setDeviceCreateInfo(
-		create_info, queue_create_info, features, indices, portability_subset,
-		physical_device, validation_layers, enableValidationLayers
+		create_info,
+		queue_create_info,
+		features, indices,
+		physical_device,
+		device_extensions,
+		validation_layers,
+		enableValidationLayers
 	);
 
 	if (vkCreateDevice(physical_device, &create_info, nullptr, &device)

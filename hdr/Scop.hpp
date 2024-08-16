@@ -18,6 +18,7 @@ class Scop
 		const uint32_t height;
 
 		std::vector<const char *> validation_layers;
+		std::vector<const char *> device_extensions;
 
 		VkInstance instance;
 		VkDebugUtilsMessengerEXT debug_messenger;
@@ -38,6 +39,13 @@ class Scop
 			bool isComplete();
 		};
 
+		struct SwapChainSupportDetails
+		{
+			VkSurfaceCapabilitiesKHR capabilities;
+			std::vector<VkSurfaceFormatKHR> formats;
+			std::vector<VkPresentModeKHR> modes;
+		};
+
 		Scop(void);
 		Scop(const Scop &cpy);
 		virtual ~Scop(void) noexcept;
@@ -54,6 +62,8 @@ class Scop
 		void pickPhysicalDevice(void);
 		bool isDeviceSuitable(const VkPhysicalDevice &device);
 		QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice &device);
+		bool checkDeviceExtensionSupport(const VkPhysicalDevice &device);
+		SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice &device);
 		void createLogicalDevice(void);
 		void mainLoop(void);
 

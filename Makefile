@@ -26,7 +26,7 @@ VULKANL := -L$(VULKAND)/lib -lvulkan -rpath $(VULKAND)/lib
 
 VULKANI := -I$(VULKAND)/include
 
-CFLAGS	+= -Wall -Wextra -Werror -Wshadow -g -std=c++2b -I$(DHDR)
+CFLAGS	+= -Wall -Wextra -Werror -g -std=c++2b -I$(DHDR)
 
 CC		:= c++
 
