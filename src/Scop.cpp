@@ -514,6 +514,11 @@ static inline void setDeviceCreateInfo(
 	}
 }
 
+Scop::SwapChainSupportDetails Scop::querySwapChainSupport(VkPhysicalDevice &dev)
+{
+	
+}
+
 /**
  * Creates an instance of a logical device.
  */
