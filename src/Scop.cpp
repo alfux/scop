@@ -139,12 +139,13 @@ void Scop::initVulkan(void)
  */
 void Scop::cleanup(void)
 {
+	vkDestroySwapchainKHR(device, swapchain, nullptr);
 	vkDestroyDevice(device, nullptr);
+	vkDestroySurfaceKHR(instance, surface, nullptr);
 	if (enableValidationLayers)
 	{
 		destroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
 	}
-	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
 }
 
@@ -175,7 +176,7 @@ static inline void createVkInstance(const VkInstanceCreateInfo &create_info,
 	std::vector<VkExtensionProperties> properties(count);
 
 	vkEnumerateInstanceExtensionProperties(nullptr, &count, properties.data());
-	if (::vkCreateInstance(&create_info, allocator, &instance) != VK_SUCCESS)
+	if (vkCreateInstance(&create_info, allocator, &instance) != VK_SUCCESS)
 	{
 		throw (Error("SDL2pp::vkCreateInstance", "failed to create instance"));
 	}
@@ -223,10 +224,12 @@ void Scop::createInstance(void)
 	create_info.enabledLayerCount = 0;
 	if (enableValidationLayers)
 	{
-		setDebugMessengerCreateInfo(debug_info);
 		create_info.enabledLayerCount =
 			static_cast<uint32_t> (validation_layers.size());
 		create_info.ppEnabledLayerNames = validation_layers.data();
+		setDebugMessengerCreateInfo(debug_info);
+		// Next line causes memory leaks, probably VkDestroyInstance forgets to
+		// deallocate the utils messenger callback.
 		create_info.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debug_info;
 	}
 	createVkInstance(create_info, nullptr, instance);
@@ -577,15 +580,69 @@ VkExtent2D Scop::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
 	return (actual_extent);
 }
 
+static inline void setSwapchainCreateInfo(
+	VkSwapchainCreateInfoKHR      &create_info,
+	Scop::SwapChainSupportDetails &swap_support,
+	VkSurfaceFormatKHR            &surface_format,
+	VkPresentModeKHR              &present_mode,
+	VkExtent2D                    &extent,
+	uint32_t                      image_count,
+	Scop::QueueFamilyIndices      &indices,
+	uint32_t                      *queue_indices,
+	VkSurfaceKHR                  &surface
+) {
+	create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	create_info.surface = surface;
+	create_info.minImageCount = image_count;
+	create_info.imageFormat = surface_format.format;
+	create_info.imageColorSpace = surface_format.colorSpace;
+	create_info.imageExtent = extent;
+	create_info.imageArrayLayers = 1;
+	create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+	if (indices.graphic_family.value() != indices.present_family.value())
+	{
+		create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		create_info.queueFamilyIndexCount = 2;
+		create_info.pQueueFamilyIndices = queue_indices;
+	}
+	else
+	{
+		create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	}
+	create_info.preTransform = swap_support.capabilities.currentTransform;
+	create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	create_info.presentMode = present_mode;
+	create_info.clipped = VK_TRUE;
+	create_info.oldSwapchain = VK_NULL_HANDLE;
+}
+
 void Scop::createSwapChain(void)
 {
-	Scop::SwapChainSupportDetails swap_chain_support
+	VkSwapchainCreateInfoKHR create_info {};
+	Scop::SwapChainSupportDetails swap_support
 		{querySwapChainSupport(physical_device)};
-	VkSurfaceFormatKHR surface_format =
-		chooseSwapSurfaceFormat(swap_chain_support.formats);
-	VkPresentModeKHR present_mode =
-		chooseSwapPresentMode(swap_chain_support.modes);
-	VkExtent2D extent = chooseSwapExtent(swap_chain_support.capabilities);
+	VkSurfaceFormatKHR surface_format
+		{chooseSwapSurfaceFormat(swap_support.formats)};
+	VkPresentModeKHR present_mode {chooseSwapPresentMode(swap_support.modes)};
+	VkExtent2D extent {chooseSwapExtent(swap_support.capabilities)};
+	uint32_t image_count = swap_support.capabilities.minImageCount + 1;
+	Scop::QueueFamilyIndices indices = findQueueFamilies(physical_device);
+	uint32_t queue_indices[] 
+		{indices.graphic_family.value(), indices.present_family.value()};
+
+	if (swap_support.capabilities.maxImageCount > 0
+		&& image_count > swap_support.capabilities.maxImageCount)
+	{
+		image_count = swap_support.capabilities.maxImageCount;
+	}
+	setSwapchainCreateInfo(create_info, swap_support, surface_format,
+		present_mode, extent, image_count, indices, queue_indices, surface);
+	if (vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain)
+		!= VK_SUCCESS)
+	{
+		throw (Error("Scop::createSwapChain", "failed swapchain creation"));
+	}
 }
 
 /**

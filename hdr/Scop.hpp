@@ -27,6 +27,7 @@ class Scop
 		VkQueue graphic_queue;
 		VkQueue present_queue;
 		VkSurfaceKHR surface;
+		VkSwapchainKHR swapchain;
 
 		const bool enableValidationLayers;
 
