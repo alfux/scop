@@ -28,6 +28,9 @@ class Scop
 		VkQueue present_queue;
 		VkSurfaceKHR surface;
 		VkSwapchainKHR swapchain;
+		std::vector<VkImage> swapchain_images;
+		VkFormat swapchain_image_format;
+		VkExtent2D swapchain_extent;
 
 		const bool enableValidationLayers;
 

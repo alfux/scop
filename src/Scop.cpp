@@ -169,13 +169,6 @@ static inline void setAppInfo(VkApplicationInfo &app_info)
 static inline void createVkInstance(const VkInstanceCreateInfo &create_info,
 	const VkAllocationCallbacks *allocator, VkInstance &instance)
 {
-	uint32_t count = 0;
-
-	vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
-
-	std::vector<VkExtensionProperties> properties(count);
-
-	vkEnumerateInstanceExtensionProperties(nullptr, &count, properties.data());
 	if (vkCreateInstance(&create_info, allocator, &instance) != VK_SUCCESS)
 	{
 		throw (Error("SDL2pp::vkCreateInstance", "failed to create instance"));
@@ -186,20 +179,19 @@ static inline void createVkInstance(const VkInstanceCreateInfo &create_info,
  * Set up the nessessary structure to initialize debug utils messenger
  */
 static inline void setDebugMessengerCreateInfo(
-	VkDebugUtilsMessengerCreateInfoEXT &info)
+	VkDebugUtilsMessengerCreateInfoEXT &debug_info)
 {
-	info.messageSeverity =
+	debug_info.messageSeverity =
 		VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
 		| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
 		| VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-	info.messageType =
+	debug_info.messageType =
 		VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
 		| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
 		| VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-	info.pfnUserCallback = Scop::debugCallback;
-	info.pUserData = nullptr;
-	info.sType =
-		VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+	debug_info.pfnUserCallback = Scop::debugCallback;
+	debug_info.pUserData = nullptr;
+	debug_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 }
 
 /**
@@ -230,7 +222,8 @@ void Scop::createInstance(void)
 		setDebugMessengerCreateInfo(debug_info);
 		// Next line causes memory leaks, probably VkDestroyInstance forgets to
 		// deallocate the utils messenger callback.
-		create_info.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debug_info;
+		create_info.pNext =
+			reinterpret_cast<VkDebugUtilsMessengerCreateInfoEXT*> (&debug_info);
 	}
 	createVkInstance(create_info, nullptr, instance);
 }
@@ -580,10 +573,13 @@ VkExtent2D Scop::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
 	return (actual_extent);
 }
 
+/**
+ * Sets necessary informations to create the swapchain
+ */
 static inline void setSwapchainCreateInfo(
 	VkSwapchainCreateInfoKHR      &create_info,
-	Scop::SwapChainSupportDetails &swap_support,
-	VkSurfaceFormatKHR            &surface_format,
+	Scop::SwapChainSupportDetails &support,
+	VkSurfaceFormatKHR            &format,
 	VkPresentModeKHR              &present_mode,
 	VkExtent2D                    &extent,
 	uint32_t                      image_count,
@@ -594,8 +590,8 @@ static inline void setSwapchainCreateInfo(
 	create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	create_info.surface = surface;
 	create_info.minImageCount = image_count;
-	create_info.imageFormat = surface_format.format;
-	create_info.imageColorSpace = surface_format.colorSpace;
+	create_info.imageFormat = format.format;
+	create_info.imageColorSpace = format.colorSpace;
 	create_info.imageExtent = extent;
 	create_info.imageArrayLayers = 1;
 	create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -610,39 +606,57 @@ static inline void setSwapchainCreateInfo(
 	{
 		create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	}
-	create_info.preTransform = swap_support.capabilities.currentTransform;
+	create_info.preTransform = support.capabilities.currentTransform;
 	create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	create_info.presentMode = present_mode;
 	create_info.clipped = VK_TRUE;
 	create_info.oldSwapchain = VK_NULL_HANDLE;
 }
 
+/**
+ * Get images handles.
+ */
+static inline void getImagesHandles(VkDevice &device, VkSwapchainKHR swapchain,
+	std::vector<VkImage> &swapchain_images)
+{
+	uint32_t count {0};
+
+	vkGetSwapchainImagesKHR(device, swapchain, &count, nullptr);
+
+	swapchain_images.resize(count);
+
+	vkGetSwapchainImagesKHR(device, swapchain, &count, swapchain_images.data());
+}
+
+/**
+ * Creates the swapchain to manage images display.
+ */
 void Scop::createSwapChain(void)
 {
 	VkSwapchainCreateInfoKHR create_info {};
-	Scop::SwapChainSupportDetails swap_support
-		{querySwapChainSupport(physical_device)};
-	VkSurfaceFormatKHR surface_format
-		{chooseSwapSurfaceFormat(swap_support.formats)};
-	VkPresentModeKHR present_mode {chooseSwapPresentMode(swap_support.modes)};
-	VkExtent2D extent {chooseSwapExtent(swap_support.capabilities)};
-	uint32_t image_count = swap_support.capabilities.minImageCount + 1;
-	Scop::QueueFamilyIndices indices = findQueueFamilies(physical_device);
-	uint32_t queue_indices[] 
-		{indices.graphic_family.value(), indices.present_family.value()};
+	SwapChainSupportDetails support {querySwapChainSupport(physical_device)};
+	VkSurfaceFormatKHR format {chooseSwapSurfaceFormat(support.formats)};
+	VkPresentModeKHR present_mode {chooseSwapPresentMode(support.modes)};
+	uint32_t image_count = support.capabilities.minImageCount + 1;
+	QueueFamilyIndices indices = findQueueFamilies(physical_device);
+	uint32_t queue_indices[] {indices.graphic_family.value(),
+		indices.present_family.value()};
 
-	if (swap_support.capabilities.maxImageCount > 0
-		&& image_count > swap_support.capabilities.maxImageCount)
+	swapchain_extent = chooseSwapExtent(support.capabilities);
+	swapchain_image_format = format.format;
+	if (support.capabilities.maxImageCount > 0
+		&& image_count > support.capabilities.maxImageCount)
 	{
-		image_count = swap_support.capabilities.maxImageCount;
+		image_count = support.capabilities.maxImageCount;
 	}
-	setSwapchainCreateInfo(create_info, swap_support, surface_format,
-		present_mode, extent, image_count, indices, queue_indices, surface);
+	setSwapchainCreateInfo(create_info, support, format, present_mode,
+		swapchain_extent, image_count, indices, queue_indices, surface);
 	if (vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain)
 		!= VK_SUCCESS)
 	{
 		throw (Error("Scop::createSwapChain", "failed swapchain creation"));
 	}
+	getImagesHandles(device, swapchain, swapchain_images);
 }
 
 /**
