@@ -132,6 +132,8 @@ void Scop::initVulkan(void)
 	pickPhysicalDevice();
 	createLogicalDevice();
 	createSwapChain();
+	createImageViews();
+	createGraphicsPipeline();
 }
 
 /**
@@ -139,6 +141,10 @@ void Scop::initVulkan(void)
  */
 void Scop::cleanup(void)
 {
+	for (const auto &image_view : swapchain_image_view)
+	{
+		vkDestroyImageView(device, image_view, nullptr);
+	}
 	vkDestroySwapchainKHR(device, swapchain, nullptr);
 	vkDestroyDevice(device, nullptr);
 	vkDestroySurfaceKHR(instance, surface, nullptr);
@@ -226,42 +232,6 @@ void Scop::createInstance(void)
 			reinterpret_cast<VkDebugUtilsMessengerCreateInfoEXT*> (&debug_info);
 	}
 	createVkInstance(create_info, nullptr, instance);
-}
-
-/**
- * Gets the debug utils messenger extension function adresss because it needs
- * to be explicitly loaded by Vulkan
- */
-VkResult Scop::createDebugUtilsMessengerEXT(
-	VkInstance                               instance,
-	const VkDebugUtilsMessengerCreateInfoEXT *p_create_info,
-	const VkAllocationCallbacks              *p_allocator,
-	VkDebugUtilsMessengerEXT                 *p_debug_messenger
-) {
-	auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>
-		(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
-
-	return (
-		func ? func(instance, p_create_info, p_allocator, p_debug_messenger)
-		: VK_ERROR_EXTENSION_NOT_PRESENT
-	);
-}
-
-/**
- * Same as its counterpart, loads the destroy debug utils messenger function
- */
-void Scop::destroyDebugUtilsMessengerEXT(
-	VkInstance                  instance,
-	VkDebugUtilsMessengerEXT    p_debug_messenger,
-	const VkAllocationCallbacks *p_allocator
-) {
-	auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>
-		(vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
-	
-	if (func)
-	{
-		func(instance, p_debug_messenger, p_allocator);
-	}
 }
 
 /**
@@ -746,6 +716,89 @@ void Scop::createLogicalDevice(void)
 }
 
 /**
+ * Creates image views for each image in the swapchain.
+ */
+void Scop::createImageViews(void)
+{
+	swapchain_image_view.resize(swapchain_images.size());
+	for (size_t i {0}; i < swapchain_images.size(); ++i)
+	{
+		VkImageViewCreateInfo create_info {};
+
+		create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		create_info.image = swapchain_images[i];
+		create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		create_info.format = swapchain_image_format;
+		create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		create_info.subresourceRange.baseMipLevel = 0;
+		create_info.subresourceRange.levelCount = 1;
+		create_info.subresourceRange.baseArrayLayer = 0;
+		create_info.subresourceRange.layerCount = 1;
+		if (vkCreateImageView(device, &create_info, nullptr,
+			&swapchain_image_view[i]) != VK_SUCCESS)
+		{
+			throw (Error("Scop::createImageViews", "failed image creation"));
+		}
+	}
+}
+
+void Scop::createGraphicsPipeline(void)
+{
+	
+}
+
+/**
+ * Main loop
+ */
+void Scop::mainLoop(void)
+{
+	while (manageEvent())
+	{
+		// Empty;
+	}
+}
+
+/**
+ * Gets the debug utils messenger extension function adresss because it needs
+ * to be explicitly loaded by Vulkan
+ */
+VkResult Scop::createDebugUtilsMessengerEXT(
+	VkInstance                               instance,
+	const VkDebugUtilsMessengerCreateInfoEXT *p_create_info,
+	const VkAllocationCallbacks              *p_allocator,
+	VkDebugUtilsMessengerEXT                 *p_debug_messenger
+) {
+	auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>
+		(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+
+	return (
+		func ? func(instance, p_create_info, p_allocator, p_debug_messenger)
+		: VK_ERROR_EXTENSION_NOT_PRESENT
+	);
+}
+
+/**
+ * Same as its counterpart, loads the destroy debug utils messenger function
+ */
+void Scop::destroyDebugUtilsMessengerEXT(
+	VkInstance                  instance,
+	VkDebugUtilsMessengerEXT    p_debug_messenger,
+	const VkAllocationCallbacks *p_allocator
+) {
+	auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>
+		(vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+	
+	if (func)
+	{
+		func(instance, p_debug_messenger, p_allocator);
+	}
+}
+
+/**
  * Custom debug message callback function
  */
 VKAPI_ATTR VkBool32 VKAPI_CALL Scop::debugCallback(
@@ -760,12 +813,4 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Scop::debugCallback(
 	std::cerr << "Validation layer: " << std::endl << "\t";
 	std::cerr << callback_data->pMessage << std::endl << std::endl;
 	return (VK_FALSE);
-}
-
-void Scop::mainLoop(void)
-{
-	while (manageEvent())
-	{
-		// Empty;
-	}
 }

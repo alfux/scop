@@ -29,6 +29,7 @@ class Scop
 		VkSurfaceKHR surface;
 		VkSwapchainKHR swapchain;
 		std::vector<VkImage> swapchain_images;
+		std::vector<VkImageView> swapchain_image_view;
 		VkFormat swapchain_image_format;
 		VkExtent2D swapchain_extent;
 
@@ -76,6 +77,8 @@ class Scop
 			const VkSurfaceCapabilitiesKHR &capabilities);
 		void createSwapChain(void);
 		void createLogicalDevice(void);
+		void createImageViews(void);
+		void createGraphicsPipeline(void);
 		void mainLoop(void);
 
 		static VkResult createDebugUtilsMessengerEXT(
