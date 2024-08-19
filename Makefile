@@ -6,15 +6,21 @@ DHDR	:= ./hdr
 
 DOBJ	:= ./obj
 
+DSHADER	:= ./shaders
+
 SRC		:= main.cpp Error.cpp SDL2pp.cpp Scop.cpp
 
 HDR		:= main.hpp Error.hpp SDL2pp.hpp Scop.hpp
 
 OBJ		:= $(SRC:%.cpp=$(DOBJ)/%.o)
 
+SHADERS	:= vert.spv frag.spv
+
 SRC		:= $(SRC:%.cpp=$(DSRC)/%.cpp)
 
 HDR		:= $(HDR:%.hpp=$(DHDR)/%.hpp)
+
+SHADERS := $(SHADERS:%.spv=$(DSHADER)/%.spv)
 
 SDLL	:= $(shell sdl2-config --libs)
 
@@ -32,7 +38,7 @@ CC		:= c++
 
 NAME	:= scop
 
-all			:	$(NAME)
+all			:	$(NAME) $(SHADERS)
 
 $(NAME)		:	$(OBJ)
 				$(CC) $(CFLAGS) $(SDLL) $(VULKANL) $^ -o $@
@@ -45,6 +51,9 @@ $(DOBJ)/%.o	:	$(DSRC)/%.cpp $(DHDR)/%.hpp | $(DOBJ)
 				$(CC) $(CFLAGS) -D NDEBUG $(SDLI) $(VULKANI) -c $< -o $@
 endif
 
+$(DSHADER)/%.spv : $(DSHADER)/shader.%
+	$(VULKAND)/bin/glslc $< -o $@
+
 $(DOBJ)		:
 				mkdir $@
 
@@ -56,6 +65,7 @@ clean		:
 
 fclean		:	clean
 				rm -rf $(NAME)
+				rm -rf $(DSHADER)/*.spv
 
 re			:	fclean all
 
