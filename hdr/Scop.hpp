@@ -8,6 +8,7 @@
 # include <cstring>
 # include <optional>
 # include <set>
+# include <fstream>
 
 class Scop
 {
@@ -32,6 +33,9 @@ class Scop
 		std::vector<VkImageView> swapchain_image_view;
 		VkFormat swapchain_image_format;
 		VkExtent2D swapchain_extent;
+		VkRenderPass render_pass;
+		VkPipelineLayout pipeline_layout;
+		VkPipeline graphics_pipeline;
 
 		const bool enableValidationLayers;
 
@@ -78,7 +82,26 @@ class Scop
 		void createSwapChain(void);
 		void createLogicalDevice(void);
 		void createImageViews(void);
+		VkAttachmentDescription setAttachmentDescription(void);
+		VkAttachmentReference setAttachmentReference(void);
+		VkSubpassDescription setSubpassDescription(VkAttachmentReference *ref);
+		void createRenderPass(void);
+		VkPipelineShaderStageCreateInfo setVertexInfo(VkShaderModule &module);
+		VkPipelineShaderStageCreateInfo setFragmentInfo(VkShaderModule &module);
+		VkPipelineVertexInputStateCreateInfo setVertexInput(void);
+		VkPipelineInputAssemblyStateCreateInfo setInputAssembly(void);
+		std::vector<VkDynamicState> setDynamicStates(void);
+		VkPipelineDynamicStateCreateInfo setDynamicState(
+			std::vector<VkDynamicState> &states);
+		VkPipelineViewportStateCreateInfo setViewportState(void);
+		VkPipelineRasterizationStateCreateInfo setRasterizer(void);
+		VkPipelineMultisampleStateCreateInfo setMultisampling(void);
+		VkPipelineColorBlendAttachmentState setColorBlendAttachment(void);
+		VkPipelineColorBlendStateCreateInfo setColorBlend(
+			VkPipelineColorBlendAttachmentState &color_blend);
+		void createPipelineLayout(void);
 		void createGraphicsPipeline(void);
+		VkShaderModule createShaderModule(const std::vector<char> &code);
 		void mainLoop(void);
 
 		static VkResult createDebugUtilsMessengerEXT(
@@ -98,6 +121,7 @@ class Scop
     		const VkDebugUtilsMessengerCallbackDataEXT  *callback_data,
     		void*                                       pUserData
 		);
+		static std::vector<char> readFile(const std::string &name);
 };
 
 #endif

@@ -81,7 +81,6 @@ SDL2pp	&SDL2pp::operator=(SDL2pp const &cpy)
 	return (*this);
 }
 
-#include <limits>
 /**
  * Creates specified window
  */

@@ -133,6 +133,7 @@ void Scop::initVulkan(void)
 	createLogicalDevice();
 	createSwapChain();
 	createImageViews();
+	createRenderPass();
 	createGraphicsPipeline();
 }
 
@@ -141,6 +142,9 @@ void Scop::initVulkan(void)
  */
 void Scop::cleanup(void)
 {
+	vkDestroyPipeline(device, graphics_pipeline, nullptr);
+	vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+	vkDestroyRenderPass(device, render_pass, nullptr);
 	for (const auto &image_view : swapchain_image_view)
 	{
 		vkDestroyImageView(device, image_view, nullptr);
@@ -210,7 +214,7 @@ void Scop::createInstance(void)
 	std::vector<const char *> extensions;
 	VkInstanceCreateInfo create_info {};
 	VkApplicationInfo app_info {};
-	VkDebugUtilsMessengerCreateInfoEXT debug_info {};
+	VkDebugUtilsMessengerCreateInfoEXT debug {};
 
 	setAppInfo(app_info);
 	sdl.getVulkanExtensions(extensions, enableValidationLayers);
@@ -225,11 +229,11 @@ void Scop::createInstance(void)
 		create_info.enabledLayerCount =
 			static_cast<uint32_t> (validation_layers.size());
 		create_info.ppEnabledLayerNames = validation_layers.data();
-		setDebugMessengerCreateInfo(debug_info);
+		setDebugMessengerCreateInfo(debug);
 		// Next line causes memory leaks, probably VkDestroyInstance forgets to
 		// deallocate the utils messenger callback.
 		create_info.pNext =
-			reinterpret_cast<VkDebugUtilsMessengerCreateInfoEXT*> (&debug_info);
+			reinterpret_cast<VkDebugUtilsMessengerCreateInfoEXT *> (&debug);
 	}
 	createVkInstance(create_info, nullptr, instance);
 }
@@ -746,9 +750,344 @@ void Scop::createImageViews(void)
 	}
 }
 
+/**
+ * Sets attachment description.
+ */
+VkAttachmentDescription Scop::setAttachmentDescription(void)
+{
+	return (
+		VkAttachmentDescription {
+			.format = swapchain_image_format,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+		}
+	);
+}
+
+/**
+ * Sets attachment reference.
+ */
+VkAttachmentReference Scop::setAttachmentReference(void)
+{
+	return (
+		VkAttachmentReference {
+			.attachment = 0,
+			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		}
+	);
+}
+
+/**
+ * Sets render subpass description.
+ */
+VkSubpassDescription Scop::setSubpassDescription(VkAttachmentReference *ref)
+{
+	return (
+		VkSubpassDescription {
+			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = ref
+		}
+	);
+}
+
+/**
+ * Creates render pass.
+ */
+void Scop::createRenderPass(void)
+{
+	VkAttachmentDescription attachment {setAttachmentDescription()};
+	VkAttachmentReference color_attachment_ref {setAttachmentReference()};
+	VkSubpassDescription subpass {setSubpassDescription(&color_attachment_ref)};
+	VkRenderPassCreateInfo create_info {};
+
+	create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	create_info.attachmentCount = 1;
+	create_info.pAttachments = &attachment;
+	create_info.subpassCount = 1;
+	create_info.pSubpasses = &subpass;
+	if (vkCreateRenderPass(device, &create_info, nullptr, &render_pass)
+		!= VK_SUCCESS)
+	{
+		throw (Error("Scop::createRenderPass", "failed creation"));
+	}
+}
+
+/**
+ * Sets the creation information for the vertex shader stage.
+ */
+VkPipelineShaderStageCreateInfo Scop::setVertexInfo(VkShaderModule &module)
+{
+	return (
+		VkPipelineShaderStageCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_VERTEX_BIT,
+			.module = module,
+			.pName = "main"
+		}
+	);
+}
+
+/**
+ * Sets the creation information for the fragment shader stage
+ */
+VkPipelineShaderStageCreateInfo Scop::setFragmentInfo(VkShaderModule &module)
+{
+	return (
+		VkPipelineShaderStageCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.module = module,
+			.pName = "main"
+		}
+	);
+}
+
+/**
+ * Sets the vertex input state create info structure.
+ */
+VkPipelineVertexInputStateCreateInfo Scop::setVertexInput(void)
+{
+	return (
+		VkPipelineVertexInputStateCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+			.vertexBindingDescriptionCount = 0,
+			.pVertexBindingDescriptions = nullptr,
+			.vertexAttributeDescriptionCount = 0,
+			.pVertexAttributeDescriptions = nullptr
+		}
+	);
+}
+
+/**
+ * Sets the input assembly create info structure.
+ */
+VkPipelineInputAssemblyStateCreateInfo Scop::setInputAssembly(void)
+{
+	return (
+		VkPipelineInputAssemblyStateCreateInfo {
+			.sType =
+				VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+			.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+			.primitiveRestartEnable = VK_FALSE
+		}
+	);
+}
+
+/**
+ * Sets the dynamic states array.
+ */
+std::vector<VkDynamicState> Scop::setDynamicStates(void)
+{
+	return (
+		std::vector<VkDynamicState> {
+			VK_DYNAMIC_STATE_VIEWPORT,
+			VK_DYNAMIC_STATE_SCISSOR
+		}
+	);
+}
+
+/**
+ * Sets the dynamic state create info structure.
+ */
+VkPipelineDynamicStateCreateInfo Scop::setDynamicState(
+	std::vector<VkDynamicState> &dynamic_states)
+{
+	return (
+		VkPipelineDynamicStateCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+			.dynamicStateCount = static_cast<uint32_t> (dynamic_states.size()),
+			.pDynamicStates = dynamic_states.data()
+		}
+	);
+}
+
+/**
+ * Sets the viewport state create info structure.
+ */
+VkPipelineViewportStateCreateInfo Scop::setViewportState(void)
+{
+	return (
+		VkPipelineViewportStateCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+			.viewportCount = 1,
+			.scissorCount = 1
+		}
+	);
+}
+
+/**
+ * Sets the rasterization state create info structure.
+ */
+VkPipelineRasterizationStateCreateInfo Scop::setRasterizer(void)
+{
+	return (
+		VkPipelineRasterizationStateCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+			.depthClampEnable = VK_FALSE,
+			.rasterizerDiscardEnable = VK_FALSE,
+			.polygonMode = VK_POLYGON_MODE_FILL,
+			.lineWidth = 1.0f,
+			.cullMode = VK_CULL_MODE_BACK_BIT,
+			.frontFace = VK_FRONT_FACE_CLOCKWISE,
+			.depthBiasEnable = VK_FALSE,
+			.depthBiasConstantFactor = 0.0f,
+			.depthBiasClamp = 0.0f,
+			.depthBiasSlopeFactor = 0.0f
+		}
+	);
+}
+
+/**
+ * Sets the multisampling create info structure.
+ */
+VkPipelineMultisampleStateCreateInfo Scop::setMultisampling(void)
+{
+	return (
+		VkPipelineMultisampleStateCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+			.sampleShadingEnable = VK_FALSE,
+			.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+			.minSampleShading = 1.0f,
+			.pSampleMask = nullptr,
+			.alphaToCoverageEnable = VK_FALSE,
+			.alphaToOneEnable = VK_FALSE
+		}
+	);
+}
+
+/**
+ * Sets the color blend attachment state structure.
+ */
+VkPipelineColorBlendAttachmentState Scop::setColorBlendAttachment(void)
+{
+	return (
+		VkPipelineColorBlendAttachmentState {
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+				| VK_COLOR_COMPONENT_G_BIT
+				| VK_COLOR_COMPONENT_B_BIT
+				| VK_COLOR_COMPONENT_A_BIT,
+			.blendEnable = VK_FALSE,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+			.alphaBlendOp = VK_BLEND_OP_ADD
+		}
+	);
+}
+
+/**
+ * Sets the color blend state create info structure.
+ */
+VkPipelineColorBlendStateCreateInfo Scop::setColorBlend(
+	VkPipelineColorBlendAttachmentState &color_blend)
+{
+	return (
+		VkPipelineColorBlendStateCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+			.logicOpEnable = VK_FALSE,
+			.logicOp = VK_LOGIC_OP_COPY,
+			.attachmentCount = 1,
+			.pAttachments = &color_blend,
+			.blendConstants[0] = 0.0f,
+			.blendConstants[1] = 0.0f,
+			.blendConstants[2] = 0.0f,
+			.blendConstants[3] = 0.0f
+		}
+	);
+}
+
+/**
+ * Creates pipeline layout and sets the handle.
+ */
+void Scop::createPipelineLayout(void)
+{
+	VkPipelineLayoutCreateInfo pipeline_layout_info {};
+
+	pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipeline_layout_info.setLayoutCount = 0;
+	pipeline_layout_info.pSetLayouts = nullptr;
+	pipeline_layout_info.pushConstantRangeCount = 0;
+	pipeline_layout_info.pPushConstantRanges = nullptr;
+	if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr,
+		&pipeline_layout) != VK_SUCCESS)
+	{
+		throw (Error("Scop::createGraphicsPipeline", "failed pipeline layout"));
+	}
+}
+
+/**
+ * Creates the graphic pipeline used to process images.
+ */
 void Scop::createGraphicsPipeline(void)
 {
-	
+	std::vector<char> vert_shader_code {readFile("shaders/vert.spv")};
+	std::vector<char> frag_shader_code {readFile("shaders/frag.spv")};
+	VkShaderModule vert_module {createShaderModule(vert_shader_code)};
+	VkShaderModule frag_module {createShaderModule(frag_shader_code)};
+	VkPipelineShaderStageCreateInfo vert_info {setVertexInfo(vert_module)};
+	VkPipelineShaderStageCreateInfo frag_info {setFragmentInfo(frag_module)};
+	VkPipelineShaderStageCreateInfo shader_stages[2] {vert_info, frag_info};
+	VkPipelineVertexInputStateCreateInfo vertex_input {setVertexInput()};
+	VkPipelineInputAssemblyStateCreateInfo input_assembly {setInputAssembly()};
+	std::vector<VkDynamicState> states {setDynamicStates()};
+	VkPipelineDynamicStateCreateInfo dynamic_state {setDynamicState(states)};
+	VkPipelineViewportStateCreateInfo viewport_state {setViewportState()};
+	VkPipelineRasterizationStateCreateInfo rasterizer {setRasterizer()};
+	VkPipelineMultisampleStateCreateInfo multisampling {setMultisampling()};
+	VkPipelineColorBlendAttachmentState blend {setColorBlendAttachment()};
+	VkPipelineColorBlendStateCreateInfo color_blending {setColorBlend(blend)};
+	VkGraphicsPipelineCreateInfo pipeline_info {};
+
+	createPipelineLayout();
+	pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipeline_info.stageCount = 2;
+	pipeline_info.pStages = shader_stages;
+	pipeline_info.pVertexInputState = &vertex_input;
+	pipeline_info.pInputAssemblyState = &input_assembly;
+	pipeline_info.pViewportState = &viewport_state;
+	pipeline_info.pRasterizationState = &rasterizer;
+	pipeline_info.pMultisampleState = &multisampling;
+	pipeline_info.pDepthStencilState = nullptr;
+	pipeline_info.pColorBlendState = &color_blending;
+	pipeline_info.pDynamicState = &dynamic_state;
+	pipeline_info.layout = pipeline_layout;
+	pipeline_info.renderPass = render_pass;
+	pipeline_info.subpass = 0;
+	pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
+	pipeline_info.basePipelineIndex = -1;
+	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info,
+		nullptr, &graphics_pipeline) != VK_SUCCESS)
+	{
+		throw (Error("Scop::createGraphicsPipeline", "failed pipeline"));
+	}
+	vkDestroyShaderModule(device, vert_module, nullptr);
+	vkDestroyShaderModule(device, frag_module, nullptr);
+}
+
+VkShaderModule Scop::createShaderModule(const std::vector<char> &code)
+{
+	VkShaderModuleCreateInfo create_info {};
+
+	create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	create_info.codeSize = code.size();
+	create_info.pCode = reinterpret_cast<const uint32_t *> (code.data());
+
+	VkShaderModule shader_module {};
+
+	if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module)
+		!= VK_SUCCESS)
+	{
+		throw (Error("Scop::createSaderModule", "failed creation"));
+	}
+	return (shader_module);
 }
 
 /**
@@ -813,4 +1152,25 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Scop::debugCallback(
 	std::cerr << "Validation layer: " << std::endl << "\t";
 	std::cerr << callback_data->pMessage << std::endl << std::endl;
 	return (VK_FALSE);
+}
+
+/**
+ * Loads an entire file into memory as a std::vector<char> in binary;
+ */
+std::vector<char> Scop::readFile(const std::string &name)
+{
+	std::ifstream file {name, std::ios::ate | std::ios::binary};
+
+	if (!file.is_open())
+	{
+		throw (Error("Scop::readFile", "failed open file"));
+	}
+
+	size_t file_size {static_cast<size_t> (file.tellg())};
+	std::vector<char> buffer(file_size);
+
+	file.seekg(0);
+	file.read(buffer.data(), file_size);
+	file.close();
+	return (buffer);
 }
