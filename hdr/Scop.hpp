@@ -99,28 +99,34 @@ class Scop
 		VkPipelineColorBlendAttachmentState setColorBlendAttachment(void);
 		VkPipelineColorBlendStateCreateInfo setColorBlend(
 			VkPipelineColorBlendAttachmentState &color_blend);
-		void createPipelineLayout(void);
-		void createGraphicsPipeline(void);
 		VkShaderModule createShaderModule(const std::vector<char> &code);
+		void createPipelineLayout(void);
+		void assembleGraphicsPipeline(
+			VkPipelineShaderStageCreateInfo        *shader_stages,
+			VkPipelineVertexInputStateCreateInfo   &vertex_input,
+			VkPipelineInputAssemblyStateCreateInfo &input_assembly,
+			VkPipelineDynamicStateCreateInfo       &dynamic_state,
+			VkPipelineViewportStateCreateInfo      &viewport_state,
+			VkPipelineRasterizationStateCreateInfo &rasterizer,
+			VkPipelineMultisampleStateCreateInfo   &multisampling,
+			VkPipelineColorBlendStateCreateInfo    &color_blending);
+		void createGraphicsPipeline(void);
 		void mainLoop(void);
 
 		static VkResult createDebugUtilsMessengerEXT(
 			VkInstance                               instance,
 			const VkDebugUtilsMessengerCreateInfoEXT *p_create_info,
 			const VkAllocationCallbacks              *p_allocator,
-			VkDebugUtilsMessengerEXT                 *p_debug_messenger
-		);
+			VkDebugUtilsMessengerEXT                 *p_debug_messenger);
 		static void destroyDebugUtilsMessengerEXT(
 			VkInstance                  instance,
 			VkDebugUtilsMessengerEXT    p_debug_messenger,
-			const VkAllocationCallbacks *p_allocator
-		);
+			const VkAllocationCallbacks *p_allocator);
 		static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     		VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
     		VkDebugUtilsMessageTypeFlagsEXT             messageTypes,
     		const VkDebugUtilsMessengerCallbackDataEXT  *callback_data,
-    		void*                                       pUserData
-		);
+    		void*                                       pUserData);
 		static std::vector<char> readFile(const std::string &name);
 };
 

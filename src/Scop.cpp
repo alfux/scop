@@ -559,8 +559,8 @@ static inline void setSwapchainCreateInfo(
 	uint32_t                      image_count,
 	Scop::QueueFamilyIndices      &indices,
 	uint32_t                      *queue_indices,
-	VkSurfaceKHR                  &surface
-) {
+	VkSurfaceKHR                  &surface)
+{
 	create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	create_info.surface = surface;
 	create_info.minImageCount = image_count;
@@ -638,8 +638,8 @@ void Scop::createSwapChain(void)
  */
 static inline void setQueueCreateInfo(
 	std::vector<VkDeviceQueueCreateInfo> &create_infos,
-	Scop::QueueFamilyIndices             &indices
-) {
+	Scop::QueueFamilyIndices             &indices)
+{
 	std::set<uint32_t> uniqueQueueFamily {
 		indices.graphic_family.value(),
 		indices.present_family.value()
@@ -671,8 +671,8 @@ static inline void setDeviceCreateInfo(
 	VkPhysicalDevice                       &physical_device,
 	std::vector<const char *>              &device_extensions,
 	std::vector<const char *>              &validation_layers,
-	bool                                   enableValidationLayers
-) {
+	bool                                   enableValidationLayers)
+{
 	setQueueCreateInfo(queue_create_info, indices);
 	vkGetPhysicalDeviceFeatures(physical_device, &features);
 	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -701,15 +701,9 @@ void Scop::createLogicalDevice(void)
 	VkPhysicalDeviceFeatures features {};
 	Scop::QueueFamilyIndices indices {findQueueFamilies(physical_device)};
 
-	setDeviceCreateInfo(
-		create_info,
-		queue_create_info,
-		features, indices,
-		physical_device,
-		device_extensions,
-		validation_layers,
-		enableValidationLayers
-	);
+	setDeviceCreateInfo(create_info, queue_create_info, features, indices,
+		physical_device, device_extensions, validation_layers,
+		enableValidationLayers);
 	if (vkCreateDevice(physical_device, &create_info, nullptr, &device)
 		 != VK_SUCCESS)
 	{
@@ -755,18 +749,16 @@ void Scop::createImageViews(void)
  */
 VkAttachmentDescription Scop::setAttachmentDescription(void)
 {
-	return (
-		VkAttachmentDescription {
-			.format = swapchain_image_format,
-			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-		}
-	);
+	return (VkAttachmentDescription {
+		.format = swapchain_image_format,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+	});
 }
 
 /**
@@ -774,12 +766,10 @@ VkAttachmentDescription Scop::setAttachmentDescription(void)
  */
 VkAttachmentReference Scop::setAttachmentReference(void)
 {
-	return (
-		VkAttachmentReference {
-			.attachment = 0,
-			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-		}
-	);
+	return (VkAttachmentReference {
+		.attachment = 0,
+		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	});
 }
 
 /**
@@ -787,13 +777,11 @@ VkAttachmentReference Scop::setAttachmentReference(void)
  */
 VkSubpassDescription Scop::setSubpassDescription(VkAttachmentReference *ref)
 {
-	return (
-		VkSubpassDescription {
-			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-			.colorAttachmentCount = 1,
-			.pColorAttachments = ref
-		}
-	);
+	return (VkSubpassDescription {
+		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+		.colorAttachmentCount = 1,
+		.pColorAttachments = ref
+	});
 }
 
 /**
@@ -823,14 +811,12 @@ void Scop::createRenderPass(void)
  */
 VkPipelineShaderStageCreateInfo Scop::setVertexInfo(VkShaderModule &module)
 {
-	return (
-		VkPipelineShaderStageCreateInfo {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-			.stage = VK_SHADER_STAGE_VERTEX_BIT,
-			.module = module,
-			.pName = "main"
-		}
-	);
+	return (VkPipelineShaderStageCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_VERTEX_BIT,
+		.module = module,
+		.pName = "main"
+	});
 }
 
 /**
@@ -838,14 +824,12 @@ VkPipelineShaderStageCreateInfo Scop::setVertexInfo(VkShaderModule &module)
  */
 VkPipelineShaderStageCreateInfo Scop::setFragmentInfo(VkShaderModule &module)
 {
-	return (
-		VkPipelineShaderStageCreateInfo {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-			.module = module,
-			.pName = "main"
-		}
-	);
+	return (VkPipelineShaderStageCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = module,
+		.pName = "main"
+	});
 }
 
 /**
@@ -853,15 +837,13 @@ VkPipelineShaderStageCreateInfo Scop::setFragmentInfo(VkShaderModule &module)
  */
 VkPipelineVertexInputStateCreateInfo Scop::setVertexInput(void)
 {
-	return (
-		VkPipelineVertexInputStateCreateInfo {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-			.vertexBindingDescriptionCount = 0,
-			.pVertexBindingDescriptions = nullptr,
-			.vertexAttributeDescriptionCount = 0,
-			.pVertexAttributeDescriptions = nullptr
-		}
-	);
+	return (VkPipelineVertexInputStateCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		.vertexBindingDescriptionCount = 0,
+		.pVertexBindingDescriptions = nullptr,
+		.vertexAttributeDescriptionCount = 0,
+		.pVertexAttributeDescriptions = nullptr
+	});
 }
 
 /**
@@ -869,14 +851,12 @@ VkPipelineVertexInputStateCreateInfo Scop::setVertexInput(void)
  */
 VkPipelineInputAssemblyStateCreateInfo Scop::setInputAssembly(void)
 {
-	return (
-		VkPipelineInputAssemblyStateCreateInfo {
-			.sType =
-				VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-			.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-			.primitiveRestartEnable = VK_FALSE
-		}
-	);
+	return (VkPipelineInputAssemblyStateCreateInfo {
+		.sType =
+			VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		.primitiveRestartEnable = VK_FALSE
+	});
 }
 
 /**
@@ -884,12 +864,10 @@ VkPipelineInputAssemblyStateCreateInfo Scop::setInputAssembly(void)
  */
 std::vector<VkDynamicState> Scop::setDynamicStates(void)
 {
-	return (
-		std::vector<VkDynamicState> {
-			VK_DYNAMIC_STATE_VIEWPORT,
-			VK_DYNAMIC_STATE_SCISSOR
-		}
-	);
+	return (std::vector<VkDynamicState> {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR
+	});
 }
 
 /**
@@ -898,13 +876,11 @@ std::vector<VkDynamicState> Scop::setDynamicStates(void)
 VkPipelineDynamicStateCreateInfo Scop::setDynamicState(
 	std::vector<VkDynamicState> &dynamic_states)
 {
-	return (
-		VkPipelineDynamicStateCreateInfo {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-			.dynamicStateCount = static_cast<uint32_t> (dynamic_states.size()),
-			.pDynamicStates = dynamic_states.data()
-		}
-	);
+	return (VkPipelineDynamicStateCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.dynamicStateCount = static_cast<uint32_t> (dynamic_states.size()),
+		.pDynamicStates = dynamic_states.data()
+	});
 }
 
 /**
@@ -912,13 +888,11 @@ VkPipelineDynamicStateCreateInfo Scop::setDynamicState(
  */
 VkPipelineViewportStateCreateInfo Scop::setViewportState(void)
 {
-	return (
-		VkPipelineViewportStateCreateInfo {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-			.viewportCount = 1,
-			.scissorCount = 1
-		}
-	);
+	return (VkPipelineViewportStateCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+		.viewportCount = 1,
+		.scissorCount = 1
+	});
 }
 
 /**
@@ -926,21 +900,19 @@ VkPipelineViewportStateCreateInfo Scop::setViewportState(void)
  */
 VkPipelineRasterizationStateCreateInfo Scop::setRasterizer(void)
 {
-	return (
-		VkPipelineRasterizationStateCreateInfo {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-			.depthClampEnable = VK_FALSE,
-			.rasterizerDiscardEnable = VK_FALSE,
-			.polygonMode = VK_POLYGON_MODE_FILL,
-			.lineWidth = 1.0f,
-			.cullMode = VK_CULL_MODE_BACK_BIT,
-			.frontFace = VK_FRONT_FACE_CLOCKWISE,
-			.depthBiasEnable = VK_FALSE,
-			.depthBiasConstantFactor = 0.0f,
-			.depthBiasClamp = 0.0f,
-			.depthBiasSlopeFactor = 0.0f
-		}
-	);
+	return (VkPipelineRasterizationStateCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.depthClampEnable = VK_FALSE,
+		.rasterizerDiscardEnable = VK_FALSE,
+		.polygonMode = VK_POLYGON_MODE_FILL,
+		.lineWidth = 1.0f,
+		.cullMode = VK_CULL_MODE_BACK_BIT,
+		.frontFace = VK_FRONT_FACE_CLOCKWISE,
+		.depthBiasEnable = VK_FALSE,
+		.depthBiasConstantFactor = 0.0f,
+		.depthBiasClamp = 0.0f,
+		.depthBiasSlopeFactor = 0.0f
+	});
 }
 
 /**
@@ -948,17 +920,15 @@ VkPipelineRasterizationStateCreateInfo Scop::setRasterizer(void)
  */
 VkPipelineMultisampleStateCreateInfo Scop::setMultisampling(void)
 {
-	return (
-		VkPipelineMultisampleStateCreateInfo {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-			.sampleShadingEnable = VK_FALSE,
-			.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-			.minSampleShading = 1.0f,
-			.pSampleMask = nullptr,
-			.alphaToCoverageEnable = VK_FALSE,
-			.alphaToOneEnable = VK_FALSE
-		}
-	);
+	return (VkPipelineMultisampleStateCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		.sampleShadingEnable = VK_FALSE,
+		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+		.minSampleShading = 1.0f,
+		.pSampleMask = nullptr,
+		.alphaToCoverageEnable = VK_FALSE,
+		.alphaToOneEnable = VK_FALSE
+	});
 }
 
 /**
@@ -966,21 +936,19 @@ VkPipelineMultisampleStateCreateInfo Scop::setMultisampling(void)
  */
 VkPipelineColorBlendAttachmentState Scop::setColorBlendAttachment(void)
 {
-	return (
-		VkPipelineColorBlendAttachmentState {
-			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-				| VK_COLOR_COMPONENT_G_BIT
-				| VK_COLOR_COMPONENT_B_BIT
-				| VK_COLOR_COMPONENT_A_BIT,
-			.blendEnable = VK_FALSE,
-			.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
-			.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
-			.colorBlendOp = VK_BLEND_OP_ADD,
-			.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-			.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-			.alphaBlendOp = VK_BLEND_OP_ADD
-		}
-	);
+	return (VkPipelineColorBlendAttachmentState {
+		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+			| VK_COLOR_COMPONENT_G_BIT
+			| VK_COLOR_COMPONENT_B_BIT
+			| VK_COLOR_COMPONENT_A_BIT,
+		.blendEnable = VK_FALSE,
+		.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+		.colorBlendOp = VK_BLEND_OP_ADD,
+		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+		.alphaBlendOp = VK_BLEND_OP_ADD
+	});
 }
 
 /**
@@ -989,19 +957,38 @@ VkPipelineColorBlendAttachmentState Scop::setColorBlendAttachment(void)
 VkPipelineColorBlendStateCreateInfo Scop::setColorBlend(
 	VkPipelineColorBlendAttachmentState &color_blend)
 {
-	return (
-		VkPipelineColorBlendStateCreateInfo {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-			.logicOpEnable = VK_FALSE,
-			.logicOp = VK_LOGIC_OP_COPY,
-			.attachmentCount = 1,
-			.pAttachments = &color_blend,
-			.blendConstants[0] = 0.0f,
-			.blendConstants[1] = 0.0f,
-			.blendConstants[2] = 0.0f,
-			.blendConstants[3] = 0.0f
-		}
-	);
+	return (VkPipelineColorBlendStateCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.logicOpEnable = VK_FALSE,
+		.logicOp = VK_LOGIC_OP_COPY,
+		.attachmentCount = 1,
+		.pAttachments = &color_blend,
+		.blendConstants[0] = 0.0f,
+		.blendConstants[1] = 0.0f,
+		.blendConstants[2] = 0.0f,
+		.blendConstants[3] = 0.0f
+	});
+}
+
+/**
+ * Creates shader module based on compiled shader bytecode.
+ */
+VkShaderModule Scop::createShaderModule(const std::vector<char> &code)
+{
+	VkShaderModuleCreateInfo create_info {};
+
+	create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	create_info.codeSize = code.size();
+	create_info.pCode = reinterpret_cast<const uint32_t *> (code.data());
+
+	VkShaderModule shader_module {};
+
+	if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module)
+		!= VK_SUCCESS)
+	{
+		throw (Error("Scop::createSaderModule", "failed creation"));
+	}
+	return (shader_module);
 }
 
 /**
@@ -1020,6 +1007,46 @@ void Scop::createPipelineLayout(void)
 		&pipeline_layout) != VK_SUCCESS)
 	{
 		throw (Error("Scop::createGraphicsPipeline", "failed pipeline layout"));
+	}
+}
+
+/**
+ * Assembles the graphics pipeline create info with all previously created
+ * structures and create the actual pipeline.
+ */
+void Scop::assembleGraphicsPipeline(
+	VkPipelineShaderStageCreateInfo        *shader_stages,
+	VkPipelineVertexInputStateCreateInfo   &vertex_input,
+	VkPipelineInputAssemblyStateCreateInfo &input_assembly,
+	VkPipelineDynamicStateCreateInfo       &dynamic_state,
+	VkPipelineViewportStateCreateInfo      &viewport_state,
+	VkPipelineRasterizationStateCreateInfo &rasterizer,
+	VkPipelineMultisampleStateCreateInfo   &multisampling,
+	VkPipelineColorBlendStateCreateInfo    &color_blend)
+{
+	VkGraphicsPipelineCreateInfo pipeline_info {};
+
+	createPipelineLayout();
+	pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipeline_info.stageCount = 2;
+	pipeline_info.pStages = shader_stages;
+	pipeline_info.pVertexInputState = &vertex_input;
+	pipeline_info.pInputAssemblyState = &input_assembly;
+	pipeline_info.pViewportState = &viewport_state;
+	pipeline_info.pRasterizationState = &rasterizer;
+	pipeline_info.pMultisampleState = &multisampling;
+	pipeline_info.pDepthStencilState = nullptr;
+	pipeline_info.pColorBlendState = &color_blend;
+	pipeline_info.pDynamicState = &dynamic_state;
+	pipeline_info.layout = pipeline_layout;
+	pipeline_info.renderPass = render_pass;
+	pipeline_info.subpass = 0;
+	pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
+	pipeline_info.basePipelineIndex = -1;
+	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info,
+		nullptr, &graphics_pipeline) != VK_SUCCESS)
+	{
+		throw (Error("Scop::assembleGraphicsPipeline", "failed pipeline"));
 	}
 }
 
@@ -1043,51 +1070,12 @@ void Scop::createGraphicsPipeline(void)
 	VkPipelineRasterizationStateCreateInfo rasterizer {setRasterizer()};
 	VkPipelineMultisampleStateCreateInfo multisampling {setMultisampling()};
 	VkPipelineColorBlendAttachmentState blend {setColorBlendAttachment()};
-	VkPipelineColorBlendStateCreateInfo color_blending {setColorBlend(blend)};
-	VkGraphicsPipelineCreateInfo pipeline_info {};
-
-	createPipelineLayout();
-	pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipeline_info.stageCount = 2;
-	pipeline_info.pStages = shader_stages;
-	pipeline_info.pVertexInputState = &vertex_input;
-	pipeline_info.pInputAssemblyState = &input_assembly;
-	pipeline_info.pViewportState = &viewport_state;
-	pipeline_info.pRasterizationState = &rasterizer;
-	pipeline_info.pMultisampleState = &multisampling;
-	pipeline_info.pDepthStencilState = nullptr;
-	pipeline_info.pColorBlendState = &color_blending;
-	pipeline_info.pDynamicState = &dynamic_state;
-	pipeline_info.layout = pipeline_layout;
-	pipeline_info.renderPass = render_pass;
-	pipeline_info.subpass = 0;
-	pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
-	pipeline_info.basePipelineIndex = -1;
-	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info,
-		nullptr, &graphics_pipeline) != VK_SUCCESS)
-	{
-		throw (Error("Scop::createGraphicsPipeline", "failed pipeline"));
-	}
+	VkPipelineColorBlendStateCreateInfo color_blend {setColorBlend(blend)};
+	
+	assembleGraphicsPipeline(shader_stages, vertex_input, input_assembly,
+		dynamic_state, viewport_state, rasterizer, multisampling, color_blend);
 	vkDestroyShaderModule(device, vert_module, nullptr);
 	vkDestroyShaderModule(device, frag_module, nullptr);
-}
-
-VkShaderModule Scop::createShaderModule(const std::vector<char> &code)
-{
-	VkShaderModuleCreateInfo create_info {};
-
-	create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	create_info.codeSize = code.size();
-	create_info.pCode = reinterpret_cast<const uint32_t *> (code.data());
-
-	VkShaderModule shader_module {};
-
-	if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module)
-		!= VK_SUCCESS)
-	{
-		throw (Error("Scop::createSaderModule", "failed creation"));
-	}
-	return (shader_module);
 }
 
 /**
@@ -1109,8 +1097,8 @@ VkResult Scop::createDebugUtilsMessengerEXT(
 	VkInstance                               instance,
 	const VkDebugUtilsMessengerCreateInfoEXT *p_create_info,
 	const VkAllocationCallbacks              *p_allocator,
-	VkDebugUtilsMessengerEXT                 *p_debug_messenger
-) {
+	VkDebugUtilsMessengerEXT                 *p_debug_messenger)
+{
 	auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>
 		(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
 
@@ -1126,8 +1114,8 @@ VkResult Scop::createDebugUtilsMessengerEXT(
 void Scop::destroyDebugUtilsMessengerEXT(
 	VkInstance                  instance,
 	VkDebugUtilsMessengerEXT    p_debug_messenger,
-	const VkAllocationCallbacks *p_allocator
-) {
+	const VkAllocationCallbacks *p_allocator)
+{
 	auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>
 		(vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
 	
@@ -1144,8 +1132,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Scop::debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT             messageTypes,
     const VkDebugUtilsMessengerCallbackDataEXT  *callback_data,
-    void*                                       pUserData
-) {
+    void*                                       pUserData)
+{
 	(void)pUserData;
 	std::cerr << "Severity: " << messageSeverity << std::endl;
 	std::cerr << "Message type: " << messageTypes << std::endl;
