@@ -20,7 +20,6 @@ class Scop
 
 		std::vector<const char *> validation_layers;
 		std::vector<const char *> device_extensions;
-
 		VkInstance instance;
 		VkDebugUtilsMessengerEXT debug_messenger;
 		VkPhysicalDevice physical_device;
@@ -36,6 +35,7 @@ class Scop
 		VkRenderPass render_pass;
 		VkPipelineLayout pipeline_layout;
 		VkPipeline graphics_pipeline;
+		std::vector<VkFramebuffer> swapchain_framebuffers;
 
 		const bool enableValidationLayers;
 
@@ -57,7 +57,7 @@ class Scop
 		Scop(void);
 		Scop(const Scop &cpy);
 		virtual ~Scop(void) noexcept;
-	
+
 		Scop &operator=(const Scop &cpy);
 
 		bool manageEvent(void);
@@ -111,6 +111,7 @@ class Scop
 			VkPipelineMultisampleStateCreateInfo   &multisampling,
 			VkPipelineColorBlendStateCreateInfo    &color_blending);
 		void createGraphicsPipeline(void);
+		void createFramebuffers(void);
 		void mainLoop(void);
 
 		static VkResult createDebugUtilsMessengerEXT(

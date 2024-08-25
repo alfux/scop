@@ -135,6 +135,7 @@ void Scop::initVulkan(void)
 	createImageViews();
 	createRenderPass();
 	createGraphicsPipeline();
+	createFramebuffers();
 }
 
 /**
@@ -142,6 +143,10 @@ void Scop::initVulkan(void)
  */
 void Scop::cleanup(void)
 {
+	for (const auto &framebuffer : swapchain_framebuffers)
+	{
+		vkDestroyFramebuffer(device, framebuffer, nullptr);
+	}
 	vkDestroyPipeline(device, graphics_pipeline, nullptr);
 	vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
 	vkDestroyRenderPass(device, render_pass, nullptr);
@@ -1076,6 +1081,32 @@ void Scop::createGraphicsPipeline(void)
 		dynamic_state, viewport_state, rasterizer, multisampling, color_blend);
 	vkDestroyShaderModule(device, vert_module, nullptr);
 	vkDestroyShaderModule(device, frag_module, nullptr);
+}
+
+/**
+ * Creates framebuffers linked to swapchain image views from the render pass.
+ */
+void Scop::createFramebuffers(void)
+{
+	swapchain_framebuffers.resize(swapchain_image_view.size());
+	for (size_t i = 0; i < swapchain_image_view.size(); ++i)
+	{
+		VkImageView attachments[] {swapchain_image_view[i]};
+		VkFramebufferCreateInfo create_info {};
+
+		create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		create_info.renderPass = render_pass;
+		create_info.attachmentCount = 1;
+		create_info.pAttachments = attachments;
+		create_info.width = swapchain_extent.width;
+		create_info.height = swapchain_extent.height;
+		create_info.layers = 1;
+		if (vkCreateFramebuffer(device, &create_info, nullptr,
+			&swapchain_framebuffers[i]) != VK_SUCCESS)
+		{
+			throw (Error("Scop::createFramebuffers", "failed creation"));
+		}
+	}
 }
 
 /**
