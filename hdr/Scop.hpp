@@ -36,6 +36,11 @@ class Scop
 		VkPipelineLayout pipeline_layout;
 		VkPipeline graphics_pipeline;
 		std::vector<VkFramebuffer> swapchain_framebuffers;
+		VkCommandPool command_pool;
+		VkCommandBuffer command_buffer;
+		VkSemaphore image_sem;
+		VkSemaphore render_sem;
+		VkFence frame_fence;
 
 		const bool enableValidationLayers;
 
@@ -85,6 +90,7 @@ class Scop
 		VkAttachmentDescription setAttachmentDescription(void);
 		VkAttachmentReference setAttachmentReference(void);
 		VkSubpassDescription setSubpassDescription(VkAttachmentReference *ref);
+		VkSubpassDependency setSubpassDependency(void);
 		void createRenderPass(void);
 		VkPipelineShaderStageCreateInfo setVertexInfo(VkShaderModule &module);
 		VkPipelineShaderStageCreateInfo setFragmentInfo(VkShaderModule &module);
@@ -112,7 +118,22 @@ class Scop
 			VkPipelineColorBlendStateCreateInfo    &color_blending);
 		void createGraphicsPipeline(void);
 		void createFramebuffers(void);
+		void createCommandPool(void);
+		void createCommandBuffer(void);
+		void createSyncObjects(void);
+		VkCommandBufferBeginInfo setBufferBeginInfo(void);
+		VkRenderPassBeginInfo setRenderPassBeginInfo(uint32_t image_index,
+			const VkClearValue &clear_color);
+		VkViewport setViewport(void);
+		void recordCommandBuffer(VkCommandBuffer buffer, uint32_t image_index);
 		void mainLoop(void);
+		VkSubmitInfo setSubmitInfo(
+			VkSemaphore          *wait_semaphore,
+			VkPipelineStageFlags *wait_stage,
+			VkSemaphore          *signal_semaphore);
+		VkPresentInfoKHR setPresentInfoKHR(VkSwapchainKHR *swapchains,
+			VkSemaphore *signal_semaphore, uint32_t *image_index);
+		void drawFrame(void);
 
 		static VkResult createDebugUtilsMessengerEXT(
 			VkInstance                               instance,

@@ -136,6 +136,9 @@ void Scop::initVulkan(void)
 	createRenderPass();
 	createGraphicsPipeline();
 	createFramebuffers();
+	createCommandPool();
+	createCommandBuffer();
+	createSyncObjects();
 }
 
 /**
@@ -143,6 +146,10 @@ void Scop::initVulkan(void)
  */
 void Scop::cleanup(void)
 {
+	vkDestroySemaphore(device, image_sem, nullptr);
+	vkDestroySemaphore(device, render_sem, nullptr);
+	vkDestroyFence(device, frame_fence, nullptr);
+	vkDestroyCommandPool(device, command_pool, nullptr);
 	for (const auto &framebuffer : swapchain_framebuffers)
 	{
 		vkDestroyFramebuffer(device, framebuffer, nullptr);
@@ -790,6 +797,21 @@ VkSubpassDescription Scop::setSubpassDescription(VkAttachmentReference *ref)
 }
 
 /**
+ * Sets subpass dependency structure.
+ */
+VkSubpassDependency Scop::setSubpassDependency(void)
+{
+	return (VkSubpassDependency {
+		.srcSubpass = VK_SUBPASS_EXTERNAL,
+		.dstSubpass = 0,
+		.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.srcAccessMask = 0,
+		.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+	});
+}
+
+/**
  * Creates render pass.
  */
 void Scop::createRenderPass(void)
@@ -797,8 +819,11 @@ void Scop::createRenderPass(void)
 	VkAttachmentDescription attachment {setAttachmentDescription()};
 	VkAttachmentReference color_attachment_ref {setAttachmentReference()};
 	VkSubpassDescription subpass {setSubpassDescription(&color_attachment_ref)};
+	VkSubpassDependency dependency {setSubpassDependency()};
 	VkRenderPassCreateInfo create_info {};
 
+	create_info.dependencyCount = 1;
+	create_info.pDependencies = &dependency;
 	create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	create_info.attachmentCount = 1;
 	create_info.pAttachments = &attachment;
@@ -1110,14 +1135,209 @@ void Scop::createFramebuffers(void)
 }
 
 /**
- * Main loop
+ * Creates the command pool.
+ */
+void Scop::createCommandPool(void)
+{
+	QueueFamilyIndices indices = findQueueFamilies(physical_device);
+	VkCommandPoolCreateInfo create_info {};
+
+	create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	create_info.queueFamilyIndex = indices.graphic_family.value();
+	if (vkCreateCommandPool(device, &create_info, nullptr, &command_pool)
+		!= VK_SUCCESS)
+	{
+		throw (Error("Scop::createCommandPool", "failed creation"));
+	}
+}
+
+/**
+ * Creates a command buffer.
+ */
+void Scop::createCommandBuffer(void)
+{
+	VkCommandBufferAllocateInfo info {};
+
+	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	info.commandPool = command_pool;
+	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	info.commandBufferCount = 1;
+	if (vkAllocateCommandBuffers(device, &info, &command_buffer) != VK_SUCCESS)
+	{
+		throw (Error("Scop::createCommandBuffer", "failed creation"));
+	}
+}
+
+/**
+ * Creates semaphores for graphics:
+ * - One so the rendering waits for images to be available from the swapchain
+ * - Second one to wait for the render pass to be finished and be presented
+ * Creates a fence for the cpu to wait for the end of the frame to avoid writing
+ * to it while it is still used by the GPU
+ */
+void Scop::createSyncObjects(void)
+{
+	VkSemaphoreCreateInfo sem {};
+	VkFenceCreateInfo fence {};
+
+	sem.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+	if (vkCreateSemaphore(device, &sem, nullptr, &image_sem) != VK_SUCCESS
+		|| vkCreateSemaphore (device, &sem, nullptr, &render_sem) != VK_SUCCESS
+		|| vkCreateFence(device, &fence, nullptr, &frame_fence) != VK_SUCCESS)
+	{
+		throw (Error("Scop::createSyncObjects", "failed creation"));
+	}
+}
+
+/**
+ * Sets the buffer begin info structure.
+ */
+VkCommandBufferBeginInfo Scop::setBufferBeginInfo(void)
+{
+	return (VkCommandBufferBeginInfo {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = 0,
+		.pInheritanceInfo = nullptr
+	});
+}
+
+/**
+ * Sets the render pass begin info structure.
+ */
+VkRenderPassBeginInfo Scop::setRenderPassBeginInfo(uint32_t image_index,
+	const VkClearValue &clear_color)
+{
+	return (VkRenderPassBeginInfo {
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass = render_pass,
+		.framebuffer = swapchain_framebuffers[image_index],
+		.renderArea.offset = {0, 0},
+		.renderArea.extent = swapchain_extent,
+		.clearValueCount = 1,
+		.pClearValues = &clear_color
+	});
+}
+
+/**
+ * Sets viewport structure.
+ */
+VkViewport Scop::setViewport(void)
+{
+	return (VkViewport {
+		.x = 0,
+		.y = 0,
+		.width = static_cast<float> (swapchain_extent.width),
+		.height = static_cast<float> (swapchain_extent.height),
+		.minDepth = 0.0f,
+		.maxDepth = 1.0f
+	});
+}
+
+/**
+ * Records commands in the command buffer <buf>.
+ */
+void Scop::recordCommandBuffer(VkCommandBuffer buf, uint32_t img_index)
+{
+	VkCommandBufferBeginInfo begin_info {setBufferBeginInfo()};
+
+	if (vkBeginCommandBuffer(buf, &begin_info) != VK_SUCCESS)
+	{
+		throw (Error("Scop::recordCommandBuffer", "failed begin"));
+	}
+
+	VkClearValue clear {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+	VkRenderPassBeginInfo pass_info {setRenderPassBeginInfo(img_index, clear)};
+	VkViewport viewport {setViewport()};
+	VkRect2D scissor {{0,0}, swapchain_extent};
+
+	vkCmdBeginRenderPass(buf, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
+	vkCmdSetViewport(buf, 0, 1, &viewport);
+	vkCmdSetScissor(buf, 0, 1, &scissor);
+	vkCmdDraw(buf, 3, 1, 0, 0);
+	vkCmdEndRenderPass(buf);
+	if (vkEndCommandBuffer(buf) != VK_SUCCESS)
+	{
+		throw (Error("Scop::recordCommandBuffer", "failed ending"));
+	}
+}
+
+/**
+ * Main loop.
  */
 void Scop::mainLoop(void)
 {
 	while (manageEvent())
 	{
-		// Empty;
+		drawFrame();
 	}
+	vkDeviceWaitIdle(device);
+}
+
+VkSubmitInfo Scop::setSubmitInfo(
+	VkSemaphore          *wait_semaphore,
+	VkPipelineStageFlags *wait_stage,
+	VkSemaphore          *signal_semaphore)
+{
+	return (VkSubmitInfo {
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = wait_semaphore,
+		.pWaitDstStageMask = wait_stage,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &command_buffer,
+		.signalSemaphoreCount = 1,
+		.pSignalSemaphores = signal_semaphore
+	});
+}
+
+VkPresentInfoKHR Scop::setPresentInfoKHR(VkSwapchainKHR *swapchains,
+	VkSemaphore *signal_semaphore, uint32_t *image_index)
+{
+	return (VkPresentInfoKHR{
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = signal_semaphore,
+		.swapchainCount = 1,
+		.pSwapchains = swapchains,
+		.pImageIndices = image_index,
+		.pResults = nullptr
+	});
+}
+
+/**
+ * Draws a frame
+ */
+void Scop::drawFrame(void)
+{
+	vkWaitForFences(device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
+	vkResetFences(device, 1, &frame_fence);
+
+	uint32_t img_idx;
+
+	vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, image_sem,
+		VK_NULL_HANDLE, &img_idx);
+	vkResetCommandBuffer(command_buffer, 0);
+	recordCommandBuffer(command_buffer, img_idx);
+
+	VkSemaphore wait_sem[] {image_sem};
+	VkPipelineStageFlags wait_stages[]
+		{VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+	VkSemaphore sig_sem[] {render_sem};
+	VkSubmitInfo submit {setSubmitInfo(wait_sem, wait_stages, sig_sem)};
+
+	if (vkQueueSubmit(graphic_queue, 1, &submit, frame_fence) != VK_SUCCESS)
+	{
+		throw (Error("Scop::drawFrame", "failed submition"));
+	}
+
+	VkSwapchainKHR swaps[] {swapchain};
+	VkPresentInfoKHR present_info {setPresentInfoKHR(swaps, sig_sem, &img_idx)};
+
+	vkQueuePresentKHR(present_queue, &present_info);
 }
 
 /**
