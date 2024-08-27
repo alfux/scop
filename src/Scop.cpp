@@ -15,10 +15,12 @@ Scop::Scop(void) :
 	sdl {SDL_INIT_EVERYTHING},
 	width {SCOP_WINDOW_WIDTH},
 	height {SCOP_WINDOW_HEIGHT},
+	max_frame_in_flight {2},
 	validation_layers {"VK_LAYER_KHRONOS_validation"},
 	device_extensions {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME},
 	physical_device {VK_NULL_HANDLE},
+	curr_frame {0},
 #ifdef NDEBUG
 	enableValidationLayers(false)
 #else
@@ -43,9 +45,11 @@ Scop::Scop(const Scop &cpy) :
 	sdl{cpy.sdl},
 	width{cpy.width},
 	height{cpy.height},
+	max_frame_in_flight {cpy.max_frame_in_flight},
 	validation_layers{cpy.validation_layers},
 	device_extensions {cpy.device_extensions},
 	physical_device {VK_NULL_HANDLE},
+	curr_frame {cpy.curr_frame},
 #ifdef NDEBUG
 	enableValidationLayers(false)
 #else
@@ -137,8 +141,34 @@ void Scop::initVulkan(void)
 	createGraphicsPipeline();
 	createFramebuffers();
 	createCommandPool();
-	createCommandBuffer();
+	createCommandBuffers();
 	createSyncObjects();
+}
+
+/**
+ * Destroys every semaphores.
+ */
+void Scop::destroySemaphores(void)
+{
+	for (const VkSemaphore &sem : image_sem)
+	{
+		vkDestroySemaphore(device, sem, nullptr);
+	}
+	for (const VkSemaphore &sem : render_sem)
+	{
+		vkDestroySemaphore(device, sem, nullptr);
+	}
+}
+
+/**
+ * Destroys every fences.
+ */
+void Scop::destroyFences(void)
+{
+	for (const VkFence &fence : frame_fence)
+	{
+		vkDestroyFence(device, fence, nullptr);
+	}
 }
 
 /**
@@ -146,9 +176,8 @@ void Scop::initVulkan(void)
  */
 void Scop::cleanup(void)
 {
-	vkDestroySemaphore(device, image_sem, nullptr);
-	vkDestroySemaphore(device, render_sem, nullptr);
-	vkDestroyFence(device, frame_fence, nullptr);
+	destroySemaphores();
+	destroyFences();
 	vkDestroyCommandPool(device, command_pool, nullptr);
 	for (const auto &framebuffer : swapchain_framebuffers)
 	{
@@ -1155,15 +1184,17 @@ void Scop::createCommandPool(void)
 /**
  * Creates a command buffer.
  */
-void Scop::createCommandBuffer(void)
+void Scop::createCommandBuffers(void)
 {
 	VkCommandBufferAllocateInfo info {};
 
+	command_buffer.resize(max_frame_in_flight);
 	info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	info.commandPool = command_pool;
 	info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	info.commandBufferCount = 1;
-	if (vkAllocateCommandBuffers(device, &info, &command_buffer) != VK_SUCCESS)
+	info.commandBufferCount = static_cast<uint32_t> (command_buffer.size());
+	if (vkAllocateCommandBuffers(device, &info, command_buffer.data())
+		!= VK_SUCCESS)
 	{
 		throw (Error("Scop::createCommandBuffer", "failed creation"));
 	}
@@ -1181,14 +1212,24 @@ void Scop::createSyncObjects(void)
 	VkSemaphoreCreateInfo sem {};
 	VkFenceCreateInfo fence {};
 
+	image_sem.resize(max_frame_in_flight);
+	render_sem.resize(max_frame_in_flight);
+	frame_fence.resize(max_frame_in_flight);
 	sem.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 	fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-	if (vkCreateSemaphore(device, &sem, nullptr, &image_sem) != VK_SUCCESS
-		|| vkCreateSemaphore (device, &sem, nullptr, &render_sem) != VK_SUCCESS
-		|| vkCreateFence(device, &fence, nullptr, &frame_fence) != VK_SUCCESS)
+	for (int i {0}; i < max_frame_in_flight; ++i)
 	{
-		throw (Error("Scop::createSyncObjects", "failed creation"));
+		if (
+			vkCreateSemaphore(device, &sem, nullptr, &image_sem[i])
+				!= VK_SUCCESS
+			|| vkCreateSemaphore(device, &sem, nullptr, &render_sem[i])
+				!= VK_SUCCESS
+			|| vkCreateFence(device, &fence, nullptr, &frame_fence[i])
+				!= VK_SUCCESS)
+		{
+			throw (Error("Scop::createSyncObjects", "failed creation"));
+		}
 	}
 }
 
@@ -1288,7 +1329,7 @@ VkSubmitInfo Scop::setSubmitInfo(
 		.pWaitSemaphores = wait_semaphore,
 		.pWaitDstStageMask = wait_stage,
 		.commandBufferCount = 1,
-		.pCommandBuffers = &command_buffer,
+		.pCommandBuffers = &command_buffer[curr_frame],
 		.signalSemaphoreCount = 1,
 		.pSignalSemaphores = signal_semaphore
 	});
@@ -1313,23 +1354,23 @@ VkPresentInfoKHR Scop::setPresentInfoKHR(VkSwapchainKHR *swapchains,
  */
 void Scop::drawFrame(void)
 {
-	vkWaitForFences(device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
-	vkResetFences(device, 1, &frame_fence);
+	vkWaitForFences(device, 1, &frame_fence[curr_frame], VK_TRUE, UINT64_MAX);
+	vkResetFences(device, 1, &frame_fence[curr_frame]);
 
 	uint32_t img_idx;
 
-	vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, image_sem,
+	vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, image_sem[curr_frame],
 		VK_NULL_HANDLE, &img_idx);
-	vkResetCommandBuffer(command_buffer, 0);
-	recordCommandBuffer(command_buffer, img_idx);
+	vkResetCommandBuffer(command_buffer[curr_frame], 0);
+	recordCommandBuffer(command_buffer[curr_frame], img_idx);
 
-	VkSemaphore wait_sem[] {image_sem};
-	VkPipelineStageFlags wait_stages[]
-		{VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-	VkSemaphore sig_sem[] {render_sem};
-	VkSubmitInfo submit {setSubmitInfo(wait_sem, wait_stages, sig_sem)};
+	VkSemaphore wait_sem[] {image_sem[curr_frame]};
+	VkPipelineStageFlags wstg[] {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+	VkSemaphore sig_sem[] {render_sem[curr_frame]};
+	VkSubmitInfo submit {setSubmitInfo(wait_sem, wstg, sig_sem)};
 
-	if (vkQueueSubmit(graphic_queue, 1, &submit, frame_fence) != VK_SUCCESS)
+	if (vkQueueSubmit(graphic_queue, 1, &submit, frame_fence[curr_frame])
+		!= VK_SUCCESS)
 	{
 		throw (Error("Scop::drawFrame", "failed submition"));
 	}
@@ -1338,6 +1379,7 @@ void Scop::drawFrame(void)
 	VkPresentInfoKHR present_info {setPresentInfoKHR(swaps, sig_sem, &img_idx)};
 
 	vkQueuePresentKHR(present_queue, &present_info);
+	curr_frame = (curr_frame + 1) % max_frame_in_flight;
 }
 
 /**

@@ -17,6 +17,7 @@ class Scop
 
 		const uint32_t width;
 		const uint32_t height;
+		const int max_frame_in_flight;
 
 		std::vector<const char *> validation_layers;
 		std::vector<const char *> device_extensions;
@@ -37,10 +38,12 @@ class Scop
 		VkPipeline graphics_pipeline;
 		std::vector<VkFramebuffer> swapchain_framebuffers;
 		VkCommandPool command_pool;
-		VkCommandBuffer command_buffer;
-		VkSemaphore image_sem;
-		VkSemaphore render_sem;
-		VkFence frame_fence;
+		std::vector<VkCommandBuffer> command_buffer;
+		std::vector<VkSemaphore> image_sem;
+		std::vector<VkSemaphore> render_sem;
+		std::vector<VkFence> frame_fence;
+
+		uint32_t curr_frame;
 
 		const bool enableValidationLayers;
 
@@ -67,6 +70,8 @@ class Scop
 
 		bool manageEvent(void);
 		void initVulkan(void);
+		void destroySemaphores(void);
+		void destroyFences(void);
 		void cleanup(void);
 		void createInstance(void);
 		void setupDebugMessenger(void);
@@ -119,7 +124,7 @@ class Scop
 		void createGraphicsPipeline(void);
 		void createFramebuffers(void);
 		void createCommandPool(void);
-		void createCommandBuffer(void);
+		void createCommandBuffers(void);
 		void createSyncObjects(void);
 		VkCommandBufferBeginInfo setBufferBeginInfo(void);
 		VkRenderPassBeginInfo setRenderPassBeginInfo(uint32_t image_index,
