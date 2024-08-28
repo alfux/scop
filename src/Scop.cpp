@@ -33,7 +33,7 @@ Scop::Scop(void) :
 		SDL_WINDOWPOS_CENTERED,
 		SCOP_WINDOW_WIDTH,
 		SCOP_WINDOW_HEIGHT,
-		SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI
+		SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE
 	);
 	initVulkan();
 }
@@ -62,7 +62,7 @@ Scop::Scop(const Scop &cpy) :
 		SDL_WINDOWPOS_CENTERED,
 		SCOP_WINDOW_WIDTH,
 		SCOP_WINDOW_HEIGHT,
-		SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI
+		SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE
 	);
 	initVulkan();
 }
@@ -171,26 +171,31 @@ void Scop::destroyFences(void)
 	}
 }
 
-/**
- * Cleans Vulkan application up before exit or reinitialisation
- */
-void Scop::cleanup(void)
+void Scop::cleanupSwapChain(void)
 {
-	destroySemaphores();
-	destroyFences();
-	vkDestroyCommandPool(device, command_pool, nullptr);
 	for (const auto &framebuffer : swapchain_framebuffers)
 	{
 		vkDestroyFramebuffer(device, framebuffer, nullptr);
 	}
-	vkDestroyPipeline(device, graphics_pipeline, nullptr);
-	vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
-	vkDestroyRenderPass(device, render_pass, nullptr);
 	for (const auto &image_view : swapchain_image_view)
 	{
 		vkDestroyImageView(device, image_view, nullptr);
 	}
 	vkDestroySwapchainKHR(device, swapchain, nullptr);
+}
+
+/**
+ * Cleans Vulkan application up before exit or reinitialisation
+ */
+void Scop::cleanup(void)
+{
+	cleanupSwapChain();
+	destroySemaphores();
+	destroyFences();
+	vkDestroyCommandPool(device, command_pool, nullptr);
+	vkDestroyPipeline(device, graphics_pipeline, nullptr);
+	vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+	vkDestroyRenderPass(device, render_pass, nullptr);
 	vkDestroyDevice(device, nullptr);
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	if (enableValidationLayers)
@@ -1350,7 +1355,7 @@ VkPresentInfoKHR Scop::setPresentInfoKHR(VkSwapchainKHR *swapchains,
 }
 
 /**
- * Draws a frame
+ * Draws a frame and present it to the screen.
  */
 void Scop::drawFrame(void)
 {
@@ -1380,6 +1385,18 @@ void Scop::drawFrame(void)
 
 	vkQueuePresentKHR(present_queue, &present_info);
 	curr_frame = (curr_frame + 1) % max_frame_in_flight;
+}
+
+/**
+ * Recreates the swapchain in case of certain events.
+ */
+void Scop::recreateSwapChain(void)
+{
+	vkDeviceWaitIdle(device);
+	cleanupSwapChain();
+	createSwapChain();
+	createImageViews();
+	createFramebuffers();
 }
 
 /**

@@ -72,6 +72,7 @@ class Scop
 		void initVulkan(void);
 		void destroySemaphores(void);
 		void destroyFences(void);
+		void cleanupSwapChain(void);
 		void cleanup(void);
 		void createInstance(void);
 		void setupDebugMessenger(void);
@@ -139,6 +140,7 @@ class Scop
 		VkPresentInfoKHR setPresentInfoKHR(VkSwapchainKHR *swapchains,
 			VkSemaphore *signal_semaphore, uint32_t *image_index);
 		void drawFrame(void);
+		void recreateSwapChain(void);
 
 		static VkResult createDebugUtilsMessengerEXT(
 			VkInstance                               instance,
