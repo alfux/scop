@@ -140,6 +140,8 @@ class Scop
 		VkPresentInfoKHR setPresentInfoKHR(VkSwapchainKHR *swapchains,
 			VkSemaphore *signal_semaphore, uint32_t *image_index);
 		void drawFrame(void);
+		void queueSubmit(void);
+		void queuePresent(uint32_t *img_idx);
 		void recreateSwapChain(void);
 
 		static VkResult createDebugUtilsMessengerEXT(

@@ -1364,11 +1364,29 @@ void Scop::drawFrame(void)
 
 	uint32_t img_idx;
 
-	vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, image_sem[curr_frame],
-		VK_NULL_HANDLE, &img_idx);
+	VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
+		image_sem[curr_frame], VK_NULL_HANDLE, &img_idx);
+	
+	if (result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		return (recreateSwapChain());
+	}
+	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+	{
+		throw (Error("Scop::drawFrame", "failed to acquire swapchain image"));
+	}
 	vkResetCommandBuffer(command_buffer[curr_frame], 0);
 	recordCommandBuffer(command_buffer[curr_frame], img_idx);
+	queueSubmit();
+	queuePresent(&img_idx);
+	curr_frame = (curr_frame + 1) % max_frame_in_flight;
+}
 
+/**
+ * Submits the command buffer to the graphic queue.
+ */
+void Scop::queueSubmit(void)
+{
 	VkSemaphore wait_sem[] {image_sem[curr_frame]};
 	VkPipelineStageFlags wstg[] {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 	VkSemaphore sig_sem[] {render_sem[curr_frame]};
@@ -1379,12 +1397,26 @@ void Scop::drawFrame(void)
 	{
 		throw (Error("Scop::drawFrame", "failed submition"));
 	}
+}
 
+/**
+ * Submits the request to present an image to the swapchain.
+ */
+void Scop::queuePresent(uint32_t *img_idx)
+{
+	VkSemaphore sig_sem[] {render_sem[curr_frame]};
 	VkSwapchainKHR swaps[] {swapchain};
-	VkPresentInfoKHR present_info {setPresentInfoKHR(swaps, sig_sem, &img_idx)};
+	VkPresentInfoKHR present_info {setPresentInfoKHR(swaps, sig_sem, img_idx)};
+	VkResult result = vkQueuePresentKHR(present_queue, &present_info);
 
-	vkQueuePresentKHR(present_queue, &present_info);
-	curr_frame = (curr_frame + 1) % max_frame_in_flight;
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+	{
+		recreateSwapChain();
+	}
+	else if (result != VK_SUCCESS)
+	{
+		throw (Error("Scop::drawFrame", "failed presentation"));
+	}
 }
 
 /**
