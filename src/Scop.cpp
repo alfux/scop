@@ -1360,10 +1360,8 @@ VkPresentInfoKHR Scop::setPresentInfoKHR(VkSwapchainKHR *swapchains,
 void Scop::drawFrame(void)
 {
 	vkWaitForFences(device, 1, &frame_fence[curr_frame], VK_TRUE, UINT64_MAX);
-	vkResetFences(device, 1, &frame_fence[curr_frame]);
 
 	uint32_t img_idx;
-
 	VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
 		image_sem[curr_frame], VK_NULL_HANDLE, &img_idx);
 	
@@ -1375,6 +1373,7 @@ void Scop::drawFrame(void)
 	{
 		throw (Error("Scop::drawFrame", "failed to acquire swapchain image"));
 	}
+	vkResetFences(device, 1, &frame_fence[curr_frame]);
 	vkResetCommandBuffer(command_buffer[curr_frame], 0);
 	recordCommandBuffer(command_buffer[curr_frame], img_idx);
 	queueSubmit();
