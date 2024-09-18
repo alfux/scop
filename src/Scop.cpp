@@ -1410,6 +1410,7 @@ void Scop::queuePresent(uint32_t *img_idx)
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
 	{
+		std::cout << "Image out of date" << std::endl;
 		recreateSwapChain();
 	}
 	else if (result != VK_SUCCESS)

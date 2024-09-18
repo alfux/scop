@@ -34,7 +34,7 @@ VULKANI := -I$(VULKAND)/include
 
 CFLAGS	+= -Wall -Wextra -Werror -g -std=c++2b -I$(DHDR)
 
-CC		:= c++
+CC		:= g++
 
 NAME	:= scop
 
